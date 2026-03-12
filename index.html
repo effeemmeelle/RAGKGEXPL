@@ -39,11 +39,13 @@
 
   /* ── HEADER ── */
   header {
-    padding: 32px 40px 24px;
+    padding: 28px 40px 22px;
     border-bottom: 1px solid var(--border);
     display: flex;
-    align-items: flex-end;
+    align-items: center;
+    justify-content: space-between;
     gap: 24px;
+    flex-wrap: wrap;
   }
   header h1 {
     font-family: 'Fraunces', serif;
@@ -56,6 +58,55 @@
   header h1 span.r { color: var(--rag); }
   header h1 span.k { color: var(--kg); }
   header p { color: var(--muted); font-size: 11px; max-width: 400px; }
+
+  .header-chunkdown-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+    border: 1px solid var(--rag);
+    border-radius: 6px;
+    padding: 12px 16px;
+    background: var(--rag-dim);
+    box-shadow: 0 0 16px rgba(74,240,168,0.08);
+    max-width: 280px;
+    text-decoration: none;
+    transition: background 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+  }
+  .header-chunkdown-badge .badge-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--rag);
+    opacity: 0.7;
+  }
+  .header-chunkdown-badge .badge-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rag);
+    line-height: 1.4;
+    text-align: right;
+  }
+  .header-chunkdown-badge a {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--rag);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+    text-align: right;
+    word-break: break-all;
+  }
+  .header-chunkdown-badge:hover {
+    background: rgba(74,240,168,0.2);
+    box-shadow: 0 0 24px rgba(74,240,168,0.18), 0 0 0 1px var(--rag);
+    transition: all 0.2s;
+  }
+  .header-chunkdown-badge a:hover { opacity: 1; text-decoration: none; }
 
   /* ── TABS ── */
   .tabs {
@@ -730,8 +781,12 @@
   <div>
     <h1><span class="r">RAG</span> &amp; <span class="k">Knowledge Graphs</span></h1>
     <p style="margin-top:6px">An interactive explorer — click through pipelines, inspect components, run mini simulations</p>
-    <p style="margin-top:6px">NOTE: Try out a demo for Chunkdown; a markdown chunker pipeline available for download at <a href="https://github.com/effeemmeelle/Chunkdown" target="_blank">https://github.com/effeemmeelle/Chunkdown</a></p>
   </div>
+  <a class="header-chunkdown-badge" href="https://github.com/effeemmeelle/Chunkdown" target="_blank">
+    <span class="badge-label">↗ Try the live app</span>
+    <span class="badge-title">Chunkdown — Markdown RAG Chunker</span>
+    <span class="badge-link-text" style="font-size:10px;color:var(--rag);opacity:0.65;text-align:right;word-break:break-all">github.com/effeemmeelle/Chunkdown</span>
+  </a>
 </header>
 
 <div class="tabs">
@@ -1078,9 +1133,9 @@ Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his de
 
 <!-- Graph canvas -->
 <div id="kg-d3-wrap" style="
-    position:relative;width:100%;height:400px;
+    position:relative;width:100%;height:560px;
     background:#070910;border:1px solid var(--border);border-top:none;
-    border-radius:0 0 6px 6px;overflow:hidden;cursor:grab">
+    border-radius:0 0 0 0;overflow:hidden;cursor:grab">
     <svg id="kg-d3-svg" style="width:100%;height:100%"></svg>
     <div id="kg-d3-tip" style="
     position:absolute;background:var(--surface);border:1px solid var(--kg);
@@ -1088,6 +1143,40 @@ Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his de
     pointer-events:none;display:none;z-index:100;
     box-shadow:0 6px 24px rgba(0,0,0,.6);line-height:1.7"></div>
 </div>
+<!-- Drag-to-resize handle -->
+<div id="kg-resize-handle" style="
+    width:100%;height:10px;
+    background:linear-gradient(to bottom, var(--border) 0%, transparent 100%);
+    border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;
+    cursor:ns-resize;display:flex;align-items:center;justify-content:center;
+    margin-bottom:10px;user-select:none;transition:background 0.15s"
+    onmouseenter="this.style.background='linear-gradient(to bottom,var(--rag-mid) 0%,transparent 100%)'"
+    onmouseleave="this.style.background='linear-gradient(to bottom,var(--border) 0%,transparent 100%)'">
+  <span style="width:32px;height:2px;border-radius:2px;background:var(--border-bright);display:block"></span>
+</div>
+<script>
+(function(){
+  const handle = document.getElementById('kg-resize-handle');
+  const wrap   = document.getElementById('kg-d3-wrap');
+  let dragging = false, startY = 0, startH = 0;
+  handle.addEventListener('mousedown', e => {
+    dragging = true; startY = e.clientY; startH = wrap.offsetHeight;
+    document.body.style.userSelect = 'none'; document.body.style.cursor = 'ns-resize';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const newH = Math.max(200, startH + (e.clientY - startY));
+    wrap.style.height = newH + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  });
+})();
+</script>
 
 <!-- Edge legend -->
 <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:var(--muted)">
@@ -1115,7 +1204,12 @@ Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his de
     <div class="card kg-card">
     <h3>Provenance edges — darwin.md</h3>
     <div class="kg-prov">
-        <!-- (keep original provenance edge rows here) -->
+        <div class="kg-edge"><span class="kg-edge-from kef-section">node_root</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h1_1 "The Life of Charles Darwin"</span></div>
+        <div class="kg-edge"><span class="kg-edge-from kef-section">node_h1_1</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h2_2 "Early Life"</span></div>
+        <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_2</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_a3f9 (intro, seq 0)</span></div>
+        <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_4 "Galápagos Obs."</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (seq 0)</span></div>
+        <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_b71c</span><span class="kg-arrow">→</span><span class="kg-edge-label">next_in_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_c22d (seq 1)</span></div>
+        <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_c22d</span><span class="kg-arrow">→</span><span class="kg-edge-label" style="color:#ef4444">parent_context</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (intro of parent)</span></div>
     </div>
     </div>
 </div>
