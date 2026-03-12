@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG & Knowledge Graphs — Interactive Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --border: #1e2330;
+    --border-bright: #2d3448;
+    --text: #c8d0e0;
+    --muted: #5a6278;
+    --rag: #4af0a8;
+    --rag-dim: rgba(74,240,168,0.12);
+    --rag-mid: rgba(74,240,168,0.3);
+    --kg: #f07848;
+    --kg-dim: rgba(240,120,72,0.12);
+    --kg-mid: rgba(240,120,72,0.3);
+    --accent: #8b9fff;
+    --accent-dim: rgba(139,159,255,0.15);
+    --warn: #f0d048;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    gap: 24px;
+  }
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+    line-height: 1;
+  }
+  header h1 span.r { color: var(--rag); }
+  header h1 span.k { color: var(--kg); }
+  header p { color: var(--muted); font-size: 11px; max-width: 400px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 16px 40px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    padding: 8px 20px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    transition: all 0.15s;
+    position: relative;
+    top: 1px;
+  }
+  .tab:hover { color: var(--text); border-color: var(--border); }
+  .tab.active-rag {
+    color: var(--rag);
+    border-color: var(--border-bright);
+    background: var(--surface);
+    border-bottom-color: var(--surface);
+  }
+  .tab.active-kg {
+    color: var(--kg);
+    border-color: var(--border-bright);
+    background: var(--surface);
+    border-bottom-color: var(--surface);
+  }
+  .tab.active-compare {
+    color: var(--accent);
+    border-color: var(--border-bright);
+    background: var(--surface);
+    border-bottom-color: var(--surface);
+  }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 32px 40px; }
+  .panel.active { display: block; }
+
+  /* ── SECTION HEADER ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .section-header .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .section-header h2 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .section-header .badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  /* ── GRID LAYOUT ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .two-col, .three-col { grid-template-columns: 1fr; } }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .card h3 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .card.rag-card { border-color: var(--rag-mid); }
+  .card.rag-card h3 { color: var(--rag); }
+  .card.kg-card { border-color: var(--kg-mid); }
+  .card.kg-card h3 { color: var(--kg); }
+  .card.neutral-card h3 { color: var(--accent); }
+
+  /* ── PIPELINE ── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 28px;
+    overflow-x: auto;
+  }
+  .pipe-step {
+    flex: 1;
+    min-width: 130px;
+    padding: 16px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pipe-step:first-child { border-radius: 6px 0 0 6px; }
+  .pipe-step:last-child { border-radius: 0 6px 6px 0; }
+  .pipe-step:not(:first-child) { border-left: none; }
+  .pipe-step:hover { z-index: 1; }
+  .pipe-step.rag-step:hover { background: var(--rag-dim); border-color: var(--rag); box-shadow: 0 0 0 1px var(--rag); }
+  .pipe-step.kg-step:hover { background: var(--kg-dim); border-color: var(--kg); box-shadow: 0 0 0 1px var(--kg); }
+  .pipe-step.active-step.rag-step { background: var(--rag-dim); border-color: var(--rag); }
+  .pipe-step.active-step.kg-step { background: var(--kg-dim); border-color: var(--kg); }
+  .pipe-step .step-num {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .pipe-step .step-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .pipe-step .step-icon { font-size: 20px; margin-bottom: 6px; }
+  .pipe-step .step-desc { font-size: 10px; color: var(--muted); line-height: 1.5; }
+  .arrow-sep {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 16px;
+    padding: 0 2px;
+    z-index: 2;
+  }
+
+  /* ── STEP DETAIL BOX ── */
+  .step-detail {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    min-height: 80px;
+    transition: all 0.2s;
+  }
+  .step-detail h4 {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .step-detail.rag-detail { border-color: var(--rag); background: var(--rag-dim); }
+  .step-detail.rag-detail h4 { color: var(--rag); }
+  .step-detail.kg-detail { border-color: var(--kg); background: var(--kg-dim); }
+  .step-detail.kg-detail h4 { color: var(--kg); }
+
+  /* ── DEMO BOX ── */
+  .demo-box {
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .demo-box label {
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .demo-box input, .demo-box textarea, .demo-box select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    resize: vertical;
+  }
+  .demo-box input:focus, .demo-box textarea:focus {
+    border-color: var(--rag);
+    box-shadow: 0 0 0 2px var(--rag-dim);
+  }
+  .demo-box textarea { min-height: 80px; }
+
+  /* ── BUTTON ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 18px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-rag { background: var(--rag); color: #000; }
+  .btn-rag:hover { background: #6fffc0; }
+  .btn-kg { background: var(--kg); color: #000; }
+  .btn-kg:hover { background: #ff9870; }
+  .btn-sm { padding: 6px 12px; font-size: 10px; }
+
+  /* ── CHUNK / DOC DISPLAY ── */
+  .chunks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
+  .chunk {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    font-size: 11px;
+    line-height: 1.6;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .chunk:hover { border-color: var(--rag-mid); }
+  .chunk.retrieved { border-color: var(--rag); background: var(--rag-dim); }
+  .chunk .chunk-id { font-size: 9px; color: var(--muted); margin-bottom: 4px; }
+  .chunk .sim-score {
+    position: absolute;
+    top: 8px; right: 8px;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--rag);
+    color: #000;
+  }
+
+  /* ── VECTOR BAR ── */
+  .vec-vis { margin-top: 10px; }
+  .vec-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .vec-label { width: 80px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vec-bar-wrap { flex: 1; height: 14px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .vec-bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .vec-bar.rag-bar { background: var(--rag); }
+  .vec-bar.kg-bar { background: var(--kg); }
+  .vec-score { width: 36px; text-align: right; flex-shrink: 0; }
+
+  /* ── KG CANVAS ── */
+  #kg-canvas {
+    width: 100%;
+    height: 360px;
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: grab;
+    display: block;
+  }
+  #kg-canvas:active { cursor: grabbing; }
+
+  /* ── SPARQL / QUERY ── */
+  .code-block {
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #aac8ff;
+    white-space: pre;
+    overflow-x: auto;
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+  .code-kw { color: var(--kg); }
+  .code-str { color: var(--rag); }
+  .code-var { color: var(--warn); }
+  .code-cm { color: var(--muted); }
+
+  /* ── COMPARE TABLE ── */
+  .compare-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .compare-table th, .compare-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .compare-table th { background: var(--surface); font-weight: 600; font-size: 11px; letter-spacing: 0.05em; }
+  .compare-table th:nth-child(2) { color: var(--rag); }
+  .compare-table th:nth-child(3) { color: var(--kg); }
+  .compare-table td:nth-child(1) { color: var(--muted); font-size: 11px; }
+  .compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .check { color: var(--rag); } .cross { color: #f06060; } .part { color: var(--warn); }
+
+  /* ── OUTPUT STREAM ── */
+  .output-stream {
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    min-height: 60px;
+    color: var(--text);
+    white-space: pre-wrap;
+    margin-top: 12px;
+  }
+  .hl-rag { background: var(--rag-dim); color: var(--rag); border-radius: 2px; padding: 0 3px; }
+  .hl-kg { background: var(--kg-dim); color: var(--kg); border-radius: 2px; padding: 0 3px; }
+
+  /* ── MISC ── */
+  .label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin: 2px;
+    letter-spacing: 0.04em;
+  }
+  .tag-rag { background: var(--rag-dim); color: var(--rag); border: 1px solid var(--rag-mid); }
+  .tag-kg { background: var(--kg-dim); color: var(--kg); border: 1px solid var(--kg-mid); }
+  .tag-neutral { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(139,159,255,0.3); }
+
+  .info-tip {
+    background: var(--accent-dim);
+    border: 1px solid rgba(139,159,255,0.3);
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .sep { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* ── GRAPH LEGEND ── */
+  .graph-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  /* ── NODE DETAIL POPUP ── */
+  #node-popup {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--kg);
+    border-radius: 6px;
+    padding: 14px 18px;
+    font-size: 11px;
+    max-width: 240px;
+    pointer-events: none;
+    display: none;
+    z-index: 1000;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  #node-popup h5 { color: var(--kg); font-size: 12px; margin-bottom: 6px; }
+  #node-popup p { color: var(--text); line-height: 1.5; }
+
+  /* animations */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .panel.active { animation: fadeIn 0.2s ease; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+  .pulsing { animation: pulse 1.2s infinite; }
+
+  /* ── CHUNKY DASHBOARD ── */
+  .chunky-banner {
+    background: linear-gradient(135deg, rgba(74,240,168,0.08) 0%, rgba(139,159,255,0.08) 100%);
+    border: 1px solid var(--border-bright);
+    border-left: 3px solid var(--rag);
+    border-radius: 6px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .chunky-banner .banner-left h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .chunky-banner .banner-left p {
+    font-size: 11px;
+    color: var(--muted);
+    max-width: 520px;
+    line-height: 1.6;
+  }
+  .btn-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border: 1px solid var(--rag-mid);
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--rag);
+    background: var(--rag-dim);
+    text-decoration: none;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-link:hover { background: rgba(74,240,168,0.22); border-color: var(--rag); }
+
+  /* Stage stepper */
+  .chunky-stepper {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .cstep {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .cstep:last-child { border-right: none; }
+  .cstep .cs-num { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .cstep .cs-name { font-size: 11px; font-weight: 600; color: var(--text); margin-top: 3px; }
+  .cstep .cs-icon { font-size: 16px; margin-bottom: 2px; }
+  .cstep:hover { background: var(--rag-dim); }
+  .cstep.cs-active { background: var(--rag-dim); border-bottom: 2px solid var(--rag); }
+  .cstep.cs-active .cs-name { color: var(--rag); }
+
+  /* Stage panels */
+  .cstage { display: none; }
+  .cstage.cs-visible { display: block; animation: fadeIn 0.18s ease; }
+
+  /* Upload stage */
+  .doc-preview {
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 18px;
+    font-size: 11px;
+    line-height: 1.8;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .doc-preview .md-h1 { color: #fff; font-size: 14px; font-weight: 700; margin: 8px 0 4px; font-family: 'Fraunces', serif; }
+  .doc-preview .md-h2 { color: var(--rag); font-size: 12px; font-weight: 600; margin: 6px 0 3px; }
+  .doc-preview .md-h3 { color: var(--accent); font-size: 11px; font-weight: 600; margin: 4px 0 2px; }
+  .doc-preview .md-p { color: var(--muted); }
+  .doc-preview .md-bold { color: var(--text); font-weight: 600; }
+
+  .heading-tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-size: 11px;
+  }
+  .ht-root { color: var(--rag); font-weight: 600; }
+  .ht-h1 { color: #fff; padding-left: 14px; }
+  .ht-h2 { color: var(--text); padding-left: 28px; }
+  .ht-h3 { color: var(--muted); padding-left: 42px; }
+  .ht-line { display: block; line-height: 2; }
+  .ht-arrow { color: var(--muted); margin-right: 5px; }
+
+  /* Config stage */
+  .preset-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .preset-btn {
+    flex: 1; min-width: 110px;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .preset-btn:hover { border-color: var(--rag-mid); background: var(--rag-dim); }
+  .preset-btn.pb-active { border-color: var(--rag); background: var(--rag-dim); }
+  .preset-btn .pb-name { font-size: 12px; font-weight: 600; color: var(--rag); }
+  .preset-btn .pb-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  .config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 700px) { .config-grid { grid-template-columns: 1fr; } }
+  .config-row { display: flex; flex-direction: column; gap: 5px; }
+  .config-row label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .config-row .config-val {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--rag);
+    font-weight: 600;
+  }
+  .config-row .config-note { font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+  /* Chunk review */
+  .chunk-stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .cstat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    min-width: 90px;
+    text-align: center;
+  }
+  .cstat .sv { font-size: 20px; font-weight: 600; color: var(--rag); font-family: 'Fraunces', serif; }
+  .cstat .sk { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+  /* Token histogram (pure CSS bars) */
+  .hist-wrap { margin-bottom: 14px; }
+  .hist-bar-row { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  .hist-range { font-size: 9px; color: var(--muted); width: 52px; text-align: right; flex-shrink: 0; }
+  .hist-bar-bg { flex: 1; height: 12px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .hist-bar-fill { height: 100%; border-radius: 2px; background: var(--rag); opacity: 0.8; transition: width 0.4s ease; }
+  .hist-count { font-size: 9px; color: var(--muted); width: 18px; flex-shrink: 0; }
+
+  /* Chunk table */
+  .ctable-wrap { overflow-x: auto; margin-bottom: 14px; }
+  .ctable { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .ctable th { background: var(--surface); color: var(--muted); font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+  .ctable td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .ctable tr:hover td { background: rgba(255,255,255,0.02); cursor: pointer; }
+  .ctable .td-id { color: var(--muted); font-size: 10px; white-space: nowrap; }
+  .ctable .td-bc { color: var(--rag); font-size: 10px; }
+  .ctable .td-tok { color: var(--warn); text-align: center; }
+  .ctable .td-preview { color: var(--text); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ctable .td-intro { text-align: center; }
+  .pill { display: inline-block; font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 600; }
+  .pill-yes { background: var(--rag-dim); color: var(--rag); border: 1px solid var(--rag-mid); }
+  .pill-no  { background: var(--border); color: var(--muted); }
+
+  /* Chunk detail panel */
+  .chunk-inspector {
+    background: #070910;
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-size: 11px;
+    line-height: 2;
+  }
+  .ci-row { display: flex; gap: 8px; }
+  .ci-key { color: var(--muted); width: 140px; flex-shrink: 0; }
+  .ci-val { color: var(--text); }
+  .ci-val.cv-rag { color: var(--rag); }
+  .ci-val.cv-warn { color: var(--warn); }
+  .ci-val.cv-text { color: var(--text); font-size: 10px; line-height: 1.6; }
+
+  /* Embed scatter (CSS only) */
+  .scatter-wrap {
+    position: relative;
+    height: 240px;
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .scatter-dot {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .scatter-dot:hover { transform: translate(-50%, -50%) scale(1.5); z-index: 10; }
+  .scatter-dot:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    left: 14px; top: -4px;
+    background: rgba(15,23,42,0.95);
+    color: var(--text);
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 20;
+    pointer-events: none;
+  }
+  .scatter-axis-x { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .scatter-axis-y { position: absolute; left: 6px; top: 50%; transform: translateY(-50%) rotate(-90deg);
+    font-size: 9px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+
+  /* KG provenance preview */
+  .kg-prov {
+    background: #070910;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 11px;
+  }
+  .kg-edge { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .kg-edge-from { background: rgba(139,159,255,0.15); border: 1px solid rgba(139,159,255,0.3); color: var(--accent); padding: 3px 8px; border-radius: 3px; }
+  .kg-edge-from.kef-section { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.4); color: #60a5fa; }
+  .kg-edge-from.kef-chunk   { background: rgba(34,197,94,0.12);  border-color: rgba(34,197,94,0.3);  color: #4ade80; }
+  .kg-edge-label { background: var(--surface); border: 1px solid var(--border); color: var(--warn); padding: 2px 7px; border-radius: 3px; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .kg-edge-to   { padding: 3px 8px; border-radius: 3px; }
+  .kg-arrow { color: var(--muted); }
+
+  /* Query results */
+  .qresult-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--rag);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .qr-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .qr-rank { font-size: 10px; font-weight: 600; color: var(--rag); }
+  .qr-score { font-size: 10px; background: var(--rag-dim); color: var(--rag); padding: 2px 7px; border-radius: 3px; }
+  .qr-bc { font-size: 10px; color: var(--muted); margin-left: auto; }
+  .qr-text { font-size: 11px; color: var(--text); line-height: 1.7; }
+  .qr-terms { margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span class="r">RAG</span> &amp; <span class="k">Knowledge Graphs</span></h1>
+    <p style="margin-top:6px">An interactive explorer — click through pipelines, inspect components, run mini simulations</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active-rag" onclick="showPanel('rag')">① RAG System</button>
+  <button class="tab" onclick="showPanel('kg')">② Knowledge Graph</button>
+  <button class="tab" onclick="showPanel('compare')">③ Compare &amp; Combine</button>
+</div>
+
+<!-- ═══════════════════════════════════ RAG PANEL ═══════════════════════════════════ -->
+<div id="panel-rag" class="panel active">
+  <div class="section-header">
+    <div class="dot" style="background:var(--rag)"></div>
+    <h2>Retrieval-Augmented Generation</h2>
+    <span class="badge" style="background:var(--rag-dim);color:var(--rag);border:1px solid var(--rag-mid)">RAG</span>
+  </div>
+
+  <div class="info-tip">
+    💡 RAG grounds an LLM in external documents at query time — it <em>retrieves</em> relevant text chunks and <em>augments</em> the prompt before generation. Click each pipeline step to learn more.
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="label-row">Pipeline — click a step to inspect it</div>
+  <div class="pipeline" id="rag-pipeline">
+    <div class="pipe-step rag-step" onclick="showRagStep(0)" id="rs0">
+      <div class="step-num">Step 01</div>
+      <div class="step-icon">📄</div>
+      <div class="step-name">Ingest Docs</div>
+      <div class="step-desc">Load raw text from files, APIs, databases</div>
+    </div>
+    <div class="pipe-step rag-step" onclick="showRagStep(1)" id="rs1">
+      <div class="step-num">Step 02</div>
+      <div class="step-icon">✂️</div>
+      <div class="step-name">Chunk</div>
+      <div class="step-desc">Split into fixed-size overlapping windows</div>
+    </div>
+    <div class="pipe-step rag-step" onclick="showRagStep(2)" id="rs2">
+      <div class="step-num">Step 03</div>
+      <div class="step-icon">🔢</div>
+      <div class="step-name">Embed</div>
+      <div class="step-desc">Encoder model → dense float vectors</div>
+    </div>
+    <div class="pipe-step rag-step" onclick="showRagStep(3)" id="rs3">
+      <div class="step-num">Step 04</div>
+      <div class="step-icon">🗄️</div>
+      <div class="step-name">Vector Store</div>
+      <div class="step-desc">Index with HNSW / IVF for fast ANN search</div>
+    </div>
+    <div class="pipe-step rag-step" onclick="showRagStep(4)" id="rs4">
+      <div class="step-num">Step 05</div>
+      <div class="step-icon">🔍</div>
+      <div class="step-name">Query &amp; Retrieve</div>
+      <div class="step-desc">Embed query, cosine similarity top-k</div>
+    </div>
+    <div class="pipe-step rag-step" onclick="showRagStep(5)" id="rs5">
+      <div class="step-num">Step 06</div>
+      <div class="step-icon">🤖</div>
+      <div class="step-name">Generate</div>
+      <div class="step-desc">LLM reads context chunks + question</div>
+    </div>
+  </div>
+
+  <div class="step-detail rag-detail" id="rag-step-detail">
+    <h4>Select a step above to inspect it</h4>
+    <p style="color:var(--muted)">Each step in the RAG pipeline has distinct engineering trade-offs. Click to explore.</p>
+  </div>
+
+  <hr class="sep">
+
+  <!-- LIVE DEMO -->
+  <div class="label-row">🧪 Mini RAG Simulation — try it</div>
+
+  <div class="two-col">
+    <div>
+      <div class="demo-box">
+        <label>Knowledge Base — small document corpus</label>
+        <textarea id="kb-text" rows="7">The Eiffel Tower was built in 1889 by Gustave Eiffel. It stands 330 meters tall in Paris.
+
+Photosynthesis is the process by which plants use sunlight, water, and carbon dioxide to produce oxygen and energy in the form of glucose.
+
+Python was created by Guido van Rossum and first released in 1991. It emphasizes code readability.
+
+The speed of light in a vacuum is approximately 299,792,458 meters per second.
+
+Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his defeat at Waterloo.</textarea>
+      </div>
+      <div class="demo-box">
+        <label>Chunk size (words)</label>
+        <input type="range" id="chunk-size" min="8" max="40" value="20" oninput="document.getElementById('chunk-size-val').textContent=this.value">
+        <span id="chunk-size-val" style="color:var(--rag);font-size:12px;margin-left:8px">20</span> words
+      </div>
+      <button class="btn btn-rag" onclick="runIngest()">▶ Ingest &amp; Chunk</button>
+    </div>
+    <div>
+      <div class="label-row" style="margin-top:0">Chunks created</div>
+      <div class="chunks-grid" id="chunks-display">
+        <div style="color:var(--muted);font-size:11px;padding:10px">Run ingest to see chunks…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-box" style="margin-top:8px">
+    <label>Your Query</label>
+    <input type="text" id="user-query" placeholder="e.g. Who built the Eiffel Tower?" value="Who built the Eiffel Tower?">
+  </div>
+
+  <div style="display:flex;gap:10px;margin-bottom:16px">
+    <button class="btn btn-rag" onclick="runRetrieval()">🔍 Retrieve top-3 chunks</button>
+    <button class="btn btn-rag" onclick="runGenerate()">🤖 Generate Answer</button>
+  </div>
+
+  <!-- Vector similarity vis -->
+  <div class="two-col">
+    <div class="card rag-card">
+      <h3>Similarity Scores (simulated cosine)</h3>
+      <div class="vec-vis" id="vec-vis">
+        <div style="color:var(--muted);font-size:11px">Run retrieval to see scores…</div>
+      </div>
+    </div>
+    <div class="card rag-card">
+      <h3>Generated Answer</h3>
+      <div class="output-stream" id="rag-output">Run retrieval + generate…</div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- ═══ CHUNKY DASHBOARD ═══ -->
+  <div class="chunky-banner">
+    <div class="banner-left">
+      <h3>🔪 Chunky — Markdown RAG Chunker Dashboard</h3>
+      <p>A full pipeline tool for turning Markdown documents into embedding-ready chunks, with a provenance knowledge graph and interactive query interface. The walkthrough below mirrors the exact stages of the live app using pre-loaded dummy data. Click each stage button to step through it.</p>
+    </div>
+    <a class="btn-link" href="https://YOUR-USERNAME.github.io/YOUR-REPO/RAGKGEXPL.html" target="_blank" id="chunky-gh-link">
+      ↗ Open Live App
+    </a>
+  </div>
+
+  <!-- Stage stepper -->
+  <div class="chunky-stepper">
+    <div class="cstep cs-active" onclick="chunkyStage(0)" id="cstep-0">
+      <div class="cs-icon">📄</div>
+      <div class="cs-num">Stage 01</div>
+      <div class="cs-name">Upload</div>
+    </div>
+    <div class="cstep" onclick="chunkyStage(1)" id="cstep-1">
+      <div class="cs-icon">⚙️</div>
+      <div class="cs-num">Stage 02</div>
+      <div class="cs-name">Configure</div>
+    </div>
+    <div class="cstep" onclick="chunkyStage(2)" id="cstep-2">
+      <div class="cs-icon">✂️</div>
+      <div class="cs-num">Stage 03</div>
+      <div class="cs-name">Chunks</div>
+    </div>
+    <div class="cstep" onclick="chunkyStage(3)" id="cstep-3">
+      <div class="cs-icon">🔢</div>
+      <div class="cs-num">Stage 04</div>
+      <div class="cs-name">Embed</div>
+    </div>
+    <div class="cstep" onclick="chunkyStage(4)" id="cstep-4">
+      <div class="cs-icon">🕸️</div>
+      <div class="cs-num">Stage 05</div>
+      <div class="cs-name">Graph</div>
+    </div>
+    <div class="cstep" onclick="chunkyStage(5)" id="cstep-5">
+      <div class="cs-icon">🔍</div>
+      <div class="cs-num">Stage 06</div>
+      <div class="cs-name">Query</div>
+    </div>
+  </div>
+
+  <!-- ── STAGE 0 : UPLOAD ── -->
+  <div class="cstage cs-visible" id="cstage-0">
+    <div class="two-col">
+      <div>
+        <div class="label-row" style="margin-bottom:8px">Document preview — rendered Markdown</div>
+        <div class="doc-preview">
+          <span class="md-h1"># The Life of Charles Darwin</span>
+          <span class="md-p" style="display:block">Charles Darwin was a British naturalist who proposed the theory of evolution. <span class="md-bold">On the Origin of Species</span>, published in 1859, transformed modern biology.</span>
+          <span class="md-h2">## Early Life</span>
+          <span class="md-p" style="display:block">Born in <span class="md-bold">Shrewsbury</span> on 12 February 1809, Darwin was the fifth of six children. His father Robert Darwin was a wealthy doctor and financier.</span>
+          <span class="md-h2">## Voyage of the Beagle</span>
+          <span class="md-p" style="display:block">From 1831 to 1836 Darwin sailed around the world on HMS Beagle. The voyage took him to the <span class="md-bold">Galápagos Islands</span> where he observed finch beak variation across islands.</span>
+          <span class="md-h3">### Galápagos Observations</span>
+          <span class="md-p" style="display:block">Darwin noted that each island had a distinct finch species adapted to local food sources. This observation seeded his later thinking on <span class="md-bold">natural selection</span>.</span>
+          <span class="md-h2">## Theory of Evolution</span>
+          <span class="md-p" style="display:block">Darwin spent over twenty years refining his ideas before publishing. He corresponded extensively with Alfred Russel Wallace, who independently reached similar conclusions.</span>
+        </div>
+      </div>
+      <div>
+        <div class="label-row" style="margin-bottom:8px">Heading tree — auto-detected</div>
+        <div class="heading-tree">
+          <span class="ht-line ht-root">📄 darwin.md</span>
+          <span class="ht-line ht-h1"><span class="ht-arrow">├─</span> H1 · The Life of Charles Darwin</span>
+          <span class="ht-line ht-h2"><span class="ht-arrow" style="padding-left:14px">├─</span> H2 · Early Life</span>
+          <span class="ht-line ht-h2"><span class="ht-arrow" style="padding-left:14px">├─</span> H2 · Voyage of the Beagle</span>
+          <span class="ht-line ht-h3"><span class="ht-arrow" style="padding-left:28px">└─</span> H3 · Galápagos Observations</span>
+          <span class="ht-line ht-h2"><span class="ht-arrow" style="padding-left:14px">└─</span> H2 · Theory of Evolution</span>
+        </div>
+        <div class="info-tip" style="margin-top:10px;font-size:11px">
+          ✔ 1 H1 · 3 H2 · 1 H3 detected. 5 section nodes will be created in the parse tree.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STAGE 1 : CONFIGURE ── -->
+  <div class="cstage" id="cstage-1">
+    <div class="label-row" style="margin-bottom:10px">Select preset — then fine-tune</div>
+    <div class="preset-row" id="chunky-preset-row">
+      <div class="preset-btn pb-active" onclick="selectPreset('Balanced',this)">
+        <div class="pb-name">Balanced</div>
+        <div class="pb-sub">max 400 · 20% overlap</div>
+      </div>
+      <div class="preset-btn" onclick="selectPreset('Precision',this)">
+        <div class="pb-name">Precision</div>
+        <div class="pb-sub">max 200 · 25% overlap</div>
+      </div>
+      <div class="preset-btn" onclick="selectPreset('Speed',this)">
+        <div class="pb-name">Speed</div>
+        <div class="pb-sub">max 512 · 10% overlap</div>
+      </div>
+    </div>
+    <div class="config-grid" id="chunky-config-grid">
+      <!-- filled by JS -->
+    </div>
+    <div class="info-tip" style="font-size:11px">
+      💡 <strong>paragraph_first</strong> tries to keep whole paragraphs together before falling back to sentence-level splitting. <strong>sentence_greedy</strong> splits to sentence level immediately and packs greedily up to max_tokens.
+    </div>
+  </div>
+
+  <!-- ── STAGE 2 : CHUNK REVIEW ── -->
+  <div class="cstage" id="cstage-2">
+    <div class="chunk-stats-row" id="chunky-stats">
+      <div class="cstat"><div class="sv">8</div><div class="sk">Total chunks</div></div>
+      <div class="cstat"><div class="sv">127</div><div class="sk">Mean tokens</div></div>
+      <div class="cstat"><div class="sv">48</div><div class="sk">Min tokens</div></div>
+      <div class="cstat"><div class="sv">312</div><div class="sk">Max tokens</div></div>
+      <div class="cstat"><div class="sv" style="color:var(--warn)">0</div><div class="sk">Force-splits</div></div>
+    </div>
+    <div class="label-row" style="margin-bottom:8px">Token distribution</div>
+    <div class="hist-wrap">
+      <div class="hist-bar-row"><span class="hist-range">0–100</span><div class="hist-bar-bg"><div class="hist-bar-fill" style="width:37.5%"></div></div><span class="hist-count">3</span></div>
+      <div class="hist-bar-row"><span class="hist-range">100–200</span><div class="hist-bar-bg"><div class="hist-bar-fill" style="width:50%"></div></div><span class="hist-count">4</span></div>
+      <div class="hist-bar-row"><span class="hist-range">200–300</span><div class="hist-bar-bg"><div class="hist-bar-fill" style="width:0%"></div></div><span class="hist-count">0</span></div>
+      <div class="hist-bar-row"><span class="hist-range">300–400</span><div class="hist-bar-bg"><div class="hist-bar-fill" style="width:12.5%"></div></div><span class="hist-count">1</span></div>
+    </div>
+    <div class="ctable-wrap">
+      <table class="ctable" id="chunky-table">
+        <thead>
+          <tr><th>#</th><th>ID</th><th>Breadcrumb</th><th>Tokens</th><th>Intro?</th><th>Preview</th></tr>
+        </thead>
+        <tbody id="chunky-tbody"></tbody>
+      </table>
+    </div>
+    <div class="label-row" style="margin-bottom:8px">Selected chunk — full inspector</div>
+    <div class="chunk-inspector" id="chunky-inspector">
+      <div style="color:var(--muted);font-size:11px">Click a row in the table above to inspect it.</div>
+    </div>
+  </div>
+
+  <!-- ── STAGE 3 : EMBED ── -->
+  <div class="cstage" id="cstage-3">
+    <div class="two-col">
+      <div>
+        <div class="label-row" style="margin-bottom:8px">Embedding backend</div>
+        <div class="card rag-card" style="margin-bottom:12px">
+          <h3>TF-IDF + LSA (active)</h3>
+          <p style="font-size:11px;color:var(--muted);line-height:1.7">Bigram TF-IDF → TruncatedSVD (128d) → L2 normalise. Fully local, no model downloads. Vocabulary: <span style="color:var(--rag)">1,284 terms</span> · Dimensions: <span style="color:var(--rag)">128</span> · 8 chunks encoded in 0.04 s.</p>
+        </div>
+        <div class="card rag-card">
+          <h3>SentenceTransformer (available)</h3>
+          <p style="font-size:11px;color:var(--muted);line-height:1.7">BAAI/bge-base-en-v1.5 · 768d · ~440 MB download. Better semantic fidelity for production. Replace <code style="color:var(--rag)">embed_texts()</code> in app.py.</p>
+        </div>
+      </div>
+      <div>
+        <div class="label-row" style="margin-bottom:8px">UMAP 2D scatter — colour = heading level</div>
+        <div class="scatter-wrap" id="chunky-scatter">
+          <!-- dots injected by JS -->
+          <span class="scatter-axis-x">UMAP dim 1</span>
+          <span class="scatter-axis-y">UMAP dim 2</span>
+        </div>
+        <div class="graph-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Level 0 (root)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Level 1 (H1)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Level 2 (H2)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Level 3 (H3)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STAGE 4 : KG ── -->
+  <div class="cstage" id="cstage-4">
+    <div class="info-tip" style="font-size:11px;margin-bottom:14px">
+      The provenance graph connects <span style="color:#60a5fa">section nodes</span> (structural) and <span style="color:#4ade80">chunk nodes</span> (content) via four typed edge kinds. In the live app this renders as a D3 force-directed graph you can pan, zoom, and click.
+    </div>
+    <div class="two-col">
+      <div>
+        <div class="label-row" style="margin-bottom:8px">Graph summary</div>
+        <div class="chunk-stats-row">
+          <div class="cstat"><div class="sv" style="color:#60a5fa">6</div><div class="sk">Section nodes</div></div>
+          <div class="cstat"><div class="sv" style="color:#4ade80">8</div><div class="sk">Chunk nodes</div></div>
+          <div class="cstat"><div class="sv">27</div><div class="sk">Total edges</div></div>
+        </div>
+        <div class="label-row" style="margin-bottom:8px">Edge legend</div>
+        <div style="font-size:11px;line-height:2.2">
+          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#3b82f6;border-radius:2px"></span><span style="color:var(--muted)">contains_section</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#22c55e;border-radius:2px"></span><span style="color:var(--muted)">has_chunk</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#f59e0b;border-radius:2px"></span><span style="color:var(--muted)">next_in_section</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:2px;background:#ef4444;border-radius:2px;border-top:2px dashed #ef4444;height:0"></span><span style="color:var(--muted)">parent_context (dashed)</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="label-row" style="margin-bottom:8px">Provenance edges — darwin.md</div>
+        <div class="kg-prov">
+          <div class="kg-edge"><span class="kg-edge-from kef-section">node_root</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h1_1 "The Life of Charles Darwin"</span></div>
+          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h1_1</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h2_2 "Early Life"</span></div>
+          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_2</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_a3f9 (intro, seq 0)</span></div>
+          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_4 "Galápagos Obs."</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (seq 0)</span></div>
+          <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_b71c</span><span class="kg-arrow">→</span><span class="kg-edge-label">next_in_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_c22d (seq 1)</span></div>
+          <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_c22d</span><span class="kg-arrow">→</span><span class="kg-edge-label" style="color:#ef4444">parent_context</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (intro of parent)</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STAGE 5 : QUERY ── -->
+  <div class="cstage" id="cstage-5">
+    <div class="demo-box" style="margin-bottom:12px">
+      <label>Query</label>
+      <input type="text" id="chunky-query-input" value="What did Darwin observe in the Galápagos?" style="font-size:12px">
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-rag" onclick="runChunkyQuery()">🔍 Run Query (top-3)</button>
+      <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="chunky-parent-ctx" style="accent-color:var(--rag)"> Include parent context
+      </label>
+    </div>
+    <div id="chunky-results">
+      <div style="color:var(--muted);font-size:11px">Run the query to see ranked results…</div>
+    </div>
+  </div>
+
+  <!-- nav buttons -->
+  <div style="display:flex;gap:10px;margin-top:16px">
+    <button class="btn btn-rag btn-sm" onclick="chunkyPrev()">← Previous stage</button>
+    <button class="btn btn-rag btn-sm" onclick="chunkyNext()">Next stage →</button>
+  </div>
+
+  <!-- ── END CHUNKY DASHBOARD ── -->
+
+  <hr class="sep">
+
+  <!-- CONCEPTS -->
+  <div class="label-row">Key Concepts</div>
+  <div class="three-col">
+    <div class="card rag-card">
+      <h3>Embedding Models</h3>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7">Convert text → dense vectors (e.g. 768d). Similar meaning → similar direction in vector space. Popular: <span class="tag tag-rag">text-embedding-3</span><span class="tag tag-rag">BGE</span><span class="tag tag-rag">E5</span></p>
+    </div>
+    <div class="card rag-card">
+      <h3>Vector Databases</h3>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7">Store &amp; index millions of vectors for fast approximate-nearest-neighbour (ANN) search. Popular: <span class="tag tag-rag">Pinecone</span><span class="tag tag-rag">Chroma</span><span class="tag tag-rag">Weaviate</span><span class="tag tag-rag">FAISS</span></p>
+    </div>
+    <div class="card rag-card">
+      <h3>Chunking Strategies</h3>
+      <p style="font-size:11px;color:var(--muted);line-height:1.7">Fixed-size, sentence, paragraph, semantic, recursive. Chunk size vs overlap is a key trade-off. Too small = lost context. Too large = noise. See the <a href="#" onclick="document.getElementById('chunky-gh-link').click();return false;" style="color:var(--rag);text-decoration:none">Chunky dashboard ↗</a> for a live demo.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ KG PANEL ═══════════════════════════════════ -->
+<div id="panel-kg" class="panel">
+  <div class="section-header">
+    <div class="dot" style="background:var(--kg)"></div>
+    <h2>Knowledge Graphs</h2>
+    <span class="badge" style="background:var(--kg-dim);color:var(--kg);border:1px solid var(--kg-mid)">KG</span>
+  </div>
+
+  <div class="info-tip" style="background:var(--kg-dim);border-color:var(--kg-mid);color:var(--kg)">
+    💡 A Knowledge Graph stores facts as <strong>(Subject → Predicate → Object)</strong> triples, enabling structured multi-hop reasoning. Click nodes and relationships to explore.
+  </div>
+
+  <!-- KG PIPELINE -->
+  <div class="label-row">Construction Pipeline</div>
+  <div class="pipeline">
+    <div class="pipe-step kg-step" onclick="showKgStep(0)">
+      <div class="step-num">Step 01</div>
+      <div class="step-icon">📑</div>
+      <div class="step-name">Source Text</div>
+      <div class="step-desc">Raw documents, structured data, APIs</div>
+    </div>
+    <div class="pipe-step kg-step" onclick="showKgStep(1)">
+      <div class="step-num">Step 02</div>
+      <div class="step-icon">🏷️</div>
+      <div class="step-name">NER</div>
+      <div class="step-desc">Named entity recognition — find people, places, things</div>
+    </div>
+    <div class="pipe-step kg-step" onclick="showKgStep(2)">
+      <div class="step-num">Step 03</div>
+      <div class="step-icon">🔗</div>
+      <div class="step-name">Relation Extraction</div>
+      <div class="step-desc">Identify typed relations between entities</div>
+    </div>
+    <div class="pipe-step kg-step" onclick="showKgStep(3)">
+      <div class="step-num">Step 04</div>
+      <div class="step-icon">🗃️</div>
+      <div class="step-name">Triple Store</div>
+      <div class="step-desc">RDF store or property graph DB</div>
+    </div>
+    <div class="pipe-step kg-step" onclick="showKgStep(4)">
+      <div class="step-num">Step 05</div>
+      <div class="step-icon">🔎</div>
+      <div class="step-name">SPARQL / Cypher</div>
+      <div class="step-desc">Structured traversal queries</div>
+    </div>
+    <div class="pipe-step kg-step" onclick="showKgStep(5)">
+      <div class="step-num">Step 06</div>
+      <div class="step-icon">🧠</div>
+      <div class="step-name">Reasoning</div>
+      <div class="step-desc">Ontology inference, path finding, link prediction</div>
+    </div>
+  </div>
+
+  <div class="step-detail kg-detail" id="kg-step-detail">
+    <h4>Select a step above to inspect it</h4>
+    <p style="color:var(--muted)">Click any construction step to understand how knowledge graphs are built.</p>
+  </div>
+
+  <hr class="sep">
+
+  <!-- INTERACTIVE GRAPH -->
+  <div class="label-row">🕸️ Interactive Knowledge Graph — click nodes &amp; add triples</div>
+  <div class="graph-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#f07848"></div>Person</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4af0a8"></div>Place</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8b9fff"></div>Concept</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f0d048"></div>Object</div>
+  </div>
+  <canvas id="kg-canvas"></canvas>
+
+  <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
+    <div class="demo-box" style="flex:1;min-width:160px;margin-bottom:0;padding:12px">
+      <label>Subject</label>
+      <input type="text" id="triple-s" placeholder="e.g. Napoleon">
+    </div>
+    <div class="demo-box" style="flex:1;min-width:160px;margin-bottom:0;padding:12px">
+      <label>Predicate</label>
+      <input type="text" id="triple-p" placeholder="e.g. bornIn">
+    </div>
+    <div class="demo-box" style="flex:1;min-width:160px;margin-bottom:0;padding:12px">
+      <label>Object</label>
+      <input type="text" id="triple-o" placeholder="e.g. Corsica">
+    </div>
+    <button class="btn btn-kg" onclick="addTriple()" style="margin-top:20px">＋ Add Triple</button>
+  </div>
+
+  <!-- Triples list -->
+  <div class="card kg-card" style="margin-top:20px">
+    <h3>Triple Store — all facts</h3>
+    <div id="triple-list" style="font-size:11px;line-height:2;margin-top:4px"></div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- QUERY DEMO -->
+  <div class="label-row">SPARQL-style Query Simulation</div>
+  <div class="two-col">
+    <div>
+      <div class="code-block"><span class="code-kw">SELECT</span> <span class="code-var">?person ?place</span>
+<span class="code-kw">WHERE</span> {
+  <span class="code-var">?person</span> <span class="code-str">:bornIn</span> <span class="code-var">?place</span> .
+  <span class="code-var">?person</span> <span class="code-str">:type</span>   <span class="code-str">"Person"</span> .
+}</div>
+      <button class="btn btn-kg btn-sm" onclick="runSparql('bornIn')">▶ Run bornIn query</button>
+      <br><br>
+      <div class="code-block"><span class="code-kw">SELECT</span> <span class="code-var">?subject ?object</span>
+<span class="code-kw">WHERE</span> {
+  <span class="code-var">?subject</span> <span class="code-str">:builtBy</span> <span class="code-var">?object</span> .
+}</div>
+      <button class="btn btn-kg btn-sm" onclick="runSparql('builtBy')">▶ Run builtBy query</button>
+    </div>
+    <div class="card kg-card">
+      <h3>Query Results</h3>
+      <div class="output-stream" id="sparql-output" style="background:transparent;border:none;padding:0;color:var(--text)">Run a query to see results…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ COMPARE PANEL ═══════════════════════════════════ -->
+<div id="panel-compare" class="panel">
+  <div class="section-header">
+    <div class="dot" style="background:var(--accent)"></div>
+    <h2>Compare &amp; Combine</h2>
+    <span class="badge" style="background:var(--accent-dim);color:var(--accent);border:1px solid rgba(139,159,255,0.3)">GraphRAG</span>
+  </div>
+
+  <div class="info-tip">
+    💡 RAG and Knowledge Graphs are complementary. Combining them — sometimes called <strong>GraphRAG</strong> — gives you both the semantic flexibility of vector search and the precision of structured graph traversal.
+  </div>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Dimension</th>
+        <th>🟢 RAG</th>
+        <th>🟠 Knowledge Graph</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Knowledge representation</td><td>Unstructured text chunks</td><td>Typed triples / property graph</td></tr>
+      <tr><td>Query mechanism</td><td>Approximate vector similarity</td><td>Exact graph traversal (SPARQL/Cypher)</td></tr>
+      <tr><td>Multi-hop reasoning</td><td class="part">⚠ Weak — context window only</td><td class="check">✔ Strong — explicit path following</td></tr>
+      <tr><td>Handles fuzzy / semantic queries</td><td class="check">✔ Strong — embedding captures meaning</td><td class="cross">✘ Weak — needs exact predicates</td></tr>
+      <tr><td>Build cost</td><td class="check">✔ Low — just embed text</td><td class="cross">✘ High — NER + RE + curation</td></tr>
+      <tr><td>Explainability</td><td class="cross">✘ Black-box similarity</td><td class="check">✔ Traceable provenance path</td></tr>
+      <tr><td>Handles new domains quickly</td><td class="check">✔ Just add docs</td><td class="cross">✘ Must update ontology</td></tr>
+      <tr><td>Structured aggregation (counts, stats)</td><td class="cross">✘ LLM must hallucinate</td><td class="check">✔ Native SPARQL aggregation</td></tr>
+      <tr><td>Best for</td><td>Open-domain Q&amp;A, chat, summarization</td><td>Enterprise knowledge, compliance, recommendations</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="sep">
+
+  <div class="label-row">GraphRAG — Hybrid Architecture</div>
+  <div class="two-col">
+    <div>
+      <div class="card neutral-card">
+        <h3>How GraphRAG works</h3>
+        <p style="font-size:11px;color:var(--muted);line-height:1.8">
+          1. <span class="tag tag-rag">Vector search</span> retrieves semantically similar chunks<br>
+          2. <span class="tag tag-kg">KG traversal</span> expands to related entities &amp; facts<br>
+          3. Both are merged into a rich context<br>
+          4. <span class="tag tag-neutral">LLM</span> generates an answer grounded in both
+        </p>
+      </div>
+      <div class="card neutral-card" style="margin-top:16px">
+        <h3>When to choose what</h3>
+        <p style="font-size:11px;color:var(--muted);line-height:1.8">
+          <strong style="color:var(--rag)">Pure RAG:</strong> chatbots, docs Q&amp;A, fast prototypes<br>
+          <strong style="color:var(--kg)">Pure KG:</strong> knowledge management, drug discovery, compliance<br>
+          <strong style="color:var(--accent)">GraphRAG:</strong> enterprise assistants, research tools, multi-hop over large corpora
+        </p>
+      </div>
+    </div>
+    <div>
+      <!-- Hybrid flow diagram -->
+      <div style="background:#070910;border:1px solid var(--border);border-radius:6px;padding:20px;font-size:11px;line-height:2.2;">
+        <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:10px">Hybrid Query Flow</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="background:var(--surface);border:1px solid var(--border);padding:8px 12px;border-radius:4px;">👤 User query: <em style="color:var(--text)">"Who influenced Eiffel's engineering?"</em></div>
+          <div style="color:var(--muted);padding-left:20px">↓ embed query</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="background:var(--rag-dim);border:1px solid var(--rag-mid);padding:8px 10px;border-radius:4px;color:var(--rag)">🔢 Vector search → 3 text chunks about Eiffel</div>
+            <div style="background:var(--kg-dim);border:1px solid var(--kg-mid);padding:8px 10px;border-radius:4px;color:var(--kg)">🕸️ KG traverse → Eiffel → influencedBy → Monier, Belanger</div>
+          </div>
+          <div style="color:var(--muted);padding-left:20px">↓ merge context</div>
+          <div style="background:var(--accent-dim);border:1px solid rgba(139,159,255,0.3);padding:8px 12px;border-radius:4px;color:var(--accent)">🤖 LLM generates grounded, multi-hop answer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <div class="label-row">Popular Tools &amp; Frameworks</div>
+  <div class="three-col">
+    <div class="card rag-card">
+      <h3>RAG Stacks</h3>
+      <span class="tag tag-rag">LangChain</span>
+      <span class="tag tag-rag">LlamaIndex</span>
+      <span class="tag tag-rag">Haystack</span>
+      <span class="tag tag-rag">FAISS</span>
+      <span class="tag tag-rag">Chroma</span>
+      <span class="tag tag-rag">Pinecone</span>
+      <span class="tag tag-rag">Weaviate</span>
+      <span class="tag tag-rag">Qdrant</span>
+    </div>
+    <div class="card kg-card">
+      <h3>KG Databases</h3>
+      <span class="tag tag-kg">Neo4j</span>
+      <span class="tag tag-kg">Amazon Neptune</span>
+      <span class="tag tag-kg">Stardog</span>
+      <span class="tag tag-kg">GraphDB</span>
+      <span class="tag tag-kg">TigerGraph</span>
+      <span class="tag tag-kg">Wikidata</span>
+    </div>
+    <div class="card neutral-card">
+      <h3>GraphRAG</h3>
+      <span class="tag tag-neutral">MS GraphRAG</span>
+      <span class="tag tag-neutral">NebulaGraph</span>
+      <span class="tag tag-neutral">LlamaIndex KG</span>
+      <span class="tag tag-neutral">Neo4j + LangChain</span>
+    </div>
+  </div>
+</div>
+
+<div id="node-popup"></div>
+
+<script>
+// ─── TAB SWITCHING ──────────────────────────────────────────────────────────
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => { t.className = 'tab'; });
+  document.getElementById('panel-' + name).classList.add('active');
+  const tabs = document.querySelectorAll('.tab');
+  const map = { rag: 0, kg: 1, compare: 2 };
+  tabs[map[name]].classList.add('active-' + name);
+}
+
+// ─── RAG STEP DETAILS ──────────────────────────────────────────────────────
+const ragSteps = [
+  { title: 'Document Ingestion', content: 'Load raw content from any source: PDFs, web scraping, databases, APIs, markdown files. At this stage you just need the raw text. Key concern: data freshness — how often do you re-ingest? Strategies include scheduled re-indexing or event-driven updates when source docs change.' },
+  { title: 'Chunking', content: 'Split documents into smaller pieces that fit within embedding model token limits (typically 512 tokens). <strong>Fixed-size chunking</strong> is simplest. <strong>Sentence chunking</strong> preserves semantic units. <strong>Overlap</strong> (e.g. 20%) prevents context loss at boundaries. Chunk size is one of the biggest RAG tuning knobs — too small loses context, too large adds noise.' },
+  { title: 'Embedding', content: 'Run each chunk through an encoder model (e.g. text-embedding-3-small, BGE-large, E5) to produce a dense vector (typically 768–3072 floats). This vector captures semantic meaning. Similar sentences → vectors close in cosine distance. Embedding quality is the biggest factor in retrieval quality.' },
+  { title: 'Vector Store & Indexing', content: 'Persist vectors in a database built for approximate nearest neighbour (ANN) search. Common indexing algorithms: HNSW (hierarchical navigable small world) for high recall, IVF-PQ for memory efficiency. Popular systems: Chroma (local), Pinecone (cloud), Weaviate (hybrid), FAISS (library). Also store the raw chunk text and metadata alongside each vector.' },
+  { title: 'Query & Retrieval', content: 'Embed the user\'s question with the same model. Compute cosine similarity against all indexed vectors. Return the top-k (typically 3–10) most similar chunks. Advanced: <strong>hybrid search</strong> mixes vector similarity with BM25 keyword search for better precision. <strong>Re-ranking</strong> with a cross-encoder model refines results further.' },
+  { title: 'Augmented Generation', content: 'Assemble a prompt: system message + retrieved chunks as context + user question. Send to an LLM (GPT-4, Claude, Llama 3…). The LLM should cite and reason over the context rather than its parametric memory. Key concern: <strong>hallucination</strong> if no relevant chunk was retrieved. Mitigation: add a "I don\'t know" fallback and source citations.' },
+];
+
+function showRagStep(i) {
+  document.querySelectorAll('.pipe-step').forEach(el => el.classList.remove('active-step'));
+  document.getElementById('rs' + i).classList.add('active-step');
+  const d = ragSteps[i];
+  const box = document.getElementById('rag-step-detail');
+  box.innerHTML = `<h4>${d.title}</h4><p style="font-size:12px;color:var(--text);line-height:1.8">${d.content}</p>`;
+}
+
+// ─── KG STEP DETAILS ───────────────────────────────────────────────────────
+const kgSteps = [
+  { title: 'Source Text', content: 'KGs can be built from unstructured text, structured databases (SQL), APIs, or manual curation. Wikidata, DBpedia and Freebase are large pre-built public KGs. Enterprise KGs are typically built from internal documents + databases.' },
+  { title: 'Named Entity Recognition (NER)', content: 'NLP models identify and classify entities: PERSON, ORGANIZATION, LOCATION, DATE, PRODUCT etc. Modern NER uses transformer-based models (spaCy, Flair, BERT fine-tuned on CoNLL-2003). Entity linking then resolves mentions to canonical IDs (e.g., "Eiffel" → Q20882 in Wikidata).' },
+  { title: 'Relation Extraction', content: 'Identify typed semantic relations between entity pairs from text. E.g.: "Gustave Eiffel designed the Eiffel Tower" → (Gustave_Eiffel, designed, Eiffel_Tower). Approaches: pattern-based, supervised classifiers, LLM-based (GPT-4 can extract relations zero-shot). This is the hardest and most error-prone step.' },
+  { title: 'Triple Store', content: 'Store facts as Subject-Predicate-Object triples (RDF standard) or as a property graph (Neo4j). RDF triple stores use the Resource Description Framework and SPARQL query language. Property graphs allow richer attributes on both nodes and edges. Scale: Wikidata has 100M+ triples.' },
+  { title: 'SPARQL / Cypher Queries', content: 'SPARQL is the W3C standard for querying RDF triple stores. Cypher is Neo4j\'s graph query language. Both allow expressing multi-hop path patterns like: "Find all people who worked at companies founded by someone who studied in Paris." This structured precision is the key advantage over vector search.' },
+  { title: 'Reasoning & Inference', content: 'Ontology-based reasoning (OWL, RDFS) lets you infer new facts from existing ones. E.g.: if (A isParentOf B) and (B isParentOf C) then infer (A isGrandparentOf C). Link prediction uses graph embeddings (TransE, RotatE) to predict likely missing triples. Path finding reveals hidden connections.' },
+];
+
+function showKgStep(i) {
+  const d = kgSteps[i];
+  const box = document.getElementById('kg-step-detail');
+  box.innerHTML = `<h4>${d.title}</h4><p style="font-size:12px;color:var(--text);line-height:1.8">${d.content}</p>`;
+}
+
+// ─── RAG SIMULATION ────────────────────────────────────────────────────────
+let ragChunks = [];
+
+function runIngest() {
+  const text = document.getElementById('kb-text').value;
+  const size = parseInt(document.getElementById('chunk-size').value);
+  const sentences = text.split('\n').filter(s => s.trim().length > 0);
+  ragChunks = [];
+  sentences.forEach((s, si) => {
+    const words = s.trim().split(/\s+/);
+    for (let i = 0; i < words.length; i += Math.floor(size * 0.8)) {
+      const chunk = words.slice(i, i + size).join(' ');
+      if (chunk.length > 10) ragChunks.push({ id: `chunk_${ragChunks.length}`, text: chunk, src: si });
+    }
+  });
+  renderChunks();
+}
+
+function renderChunks(highlighted = []) {
+  const grid = document.getElementById('chunks-display');
+  if (!ragChunks.length) { grid.innerHTML = '<div style="color:var(--muted);font-size:11px;padding:10px">No chunks yet.</div>'; return; }
+  grid.innerHTML = ragChunks.map((c, i) => {
+    const isHit = highlighted.includes(i);
+    return `<div class="chunk ${isHit ? 'retrieved' : ''}">
+      <div class="chunk-id">${c.id}</div>
+      ${isHit ? `<span class="sim-score">${highlighted.simMap ? highlighted.simMap[i] : ''}★</span>` : ''}
+      ${c.text}
+    </div>`;
+  }).join('');
+}
+
+function simCosineSim(query, chunkText) {
+  // Fake but instructive similarity — keyword overlap heuristic
+  const qWords = new Set(query.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/));
+  const cWords = new Set(chunkText.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/));
+  let overlap = 0;
+  qWords.forEach(w => { if (cWords.has(w)) overlap++; });
+  const base = overlap / Math.max(qWords.size, 1);
+  return Math.min(0.99, base + Math.random() * 0.05).toFixed(2);
+}
+
+function runRetrieval() {
+  if (!ragChunks.length) { alert('Run Ingest first!'); return; }
+  const query = document.getElementById('user-query').value;
+  const scored = ragChunks.map((c, i) => ({ i, score: parseFloat(simCosineSim(query, c.text)) }));
+  scored.sort((a, b) => b.score - a.score);
+  const top3 = scored.slice(0, 3);
+
+  // Highlight chunks
+  const highlighted = top3.map(x => x.i);
+  renderChunks(highlighted);
+
+  // Show vector bars
+  const vis = document.getElementById('vec-vis');
+  vis.innerHTML = scored.map(({ i, score }) => {
+    const isTop = top3.some(t => t.i === i);
+    return `<div class="vec-row">
+      <div class="vec-label" title="${ragChunks[i].text}">${ragChunks[i].id}</div>
+      <div class="vec-bar-wrap"><div class="vec-bar rag-bar" style="width:${score * 100}%;opacity:${isTop ? 1 : 0.3}"></div></div>
+      <div class="vec-score" style="color:${isTop ? 'var(--rag)' : 'var(--muted)'}">${score}</div>
+    </div>`;
+  }).join('');
+}
+
+function runGenerate() {
+  if (!ragChunks.length) { alert('Run Ingest first!'); return; }
+  const query = document.getElementById('user-query').value;
+  const scored = ragChunks.map((c, i) => ({ i, score: parseFloat(simCosineSim(query, c.text)) }));
+  scored.sort((a, b) => b.score - a.score);
+  const topChunks = scored.slice(0, 3).map(x => ragChunks[x.i].text);
+
+  // Simulated LLM output
+  const output = document.getElementById('rag-output');
+  const context = topChunks.join(' ');
+
+  // Very simple pattern matching to simulate generation
+  let answer = '';
+  const q = query.toLowerCase();
+  if (q.includes('eiffel') || q.includes('built') || q.includes('tower')) {
+    answer = `Based on the retrieved context:\n\n<span class="hl-rag">"${topChunks[0]}"</span>\n\nThe Eiffel Tower was built by <strong>Gustave Eiffel</strong> in 1889. It stands 330 meters tall and is located in Paris.`;
+  } else if (q.includes('python') || q.includes('created')) {
+    answer = `Based on the retrieved context:\n\n<span class="hl-rag">"${topChunks[0]}"</span>\n\nPython was created by <strong>Guido van Rossum</strong> and first released in 1991.`;
+  } else if (q.includes('light') || q.includes('speed')) {
+    answer = `Based on the retrieved context:\n\n<span class="hl-rag">"${topChunks[0]}"</span>\n\nThe speed of light in a vacuum is approximately <strong>299,792,458 m/s</strong>.`;
+  } else {
+    answer = `Based on the retrieved context:\n\n<span class="hl-rag">"${topChunks[0]}"</span>\n\n<span style="color:var(--muted)">[Simulated LLM answer based on retrieved chunk above. In a real system, the LLM reads all top-k chunks and generates a grounded response.]</span>`;
+  }
+  output.innerHTML = answer;
+}
+
+// ─── KNOWLEDGE GRAPH ────────────────────────────────────────────────────────
+const canvas = document.getElementById('kg-canvas');
+const ctx = canvas.getContext('2d');
+
+const nodeTypes = { Person: '#f07848', Place: '#4af0a8', Concept: '#8b9fff', Object: '#f0d048' };
+
+let kgNodes = [
+  { id: 'Gustave Eiffel', type: 'Person', x: 0, y: 0, vx: 0, vy: 0, desc: 'French engineer, designed the Eiffel Tower' },
+  { id: 'Eiffel Tower', type: 'Object', x: 0, y: 0, vx: 0, vy: 0, desc: 'Iron lattice tower in Paris, built 1889' },
+  { id: 'Paris', type: 'Place', x: 0, y: 0, vx: 0, vy: 0, desc: 'Capital of France' },
+  { id: 'France', type: 'Place', x: 0, y: 0, vx: 0, vy: 0, desc: 'Country in Western Europe' },
+  { id: 'Engineering', type: 'Concept', x: 0, y: 0, vx: 0, vy: 0, desc: 'Applied science of design and construction' },
+];
+let kgEdges = [
+  { s: 'Gustave Eiffel', p: 'builtBy←', o: 'Eiffel Tower' },
+  { s: 'Eiffel Tower', p: 'locatedIn', o: 'Paris' },
+  { s: 'Paris', p: 'capitalOf', o: 'France' },
+  { s: 'Gustave Eiffel', p: 'bornIn', o: 'France' },
+  { s: 'Gustave Eiffel', p: 'expertIn', o: 'Engineering' },
+];
+
+function inferNodeType(name) {
+  const n = name.toLowerCase();
+  if (['paris','france','corsica','london','berlin','rome','italy','spain'].some(p => n.includes(p))) return 'Place';
+  if (['tower','bridge','car','computer','phone','book'].some(o => n.includes(o))) return 'Object';
+  if (['theory','science','math','engineering','philosophy','law'].some(c => n.includes(c))) return 'Concept';
+  return 'Person';
+}
+
+function initNodePositions() {
+  const W = canvas.width, H = canvas.height;
+  kgNodes.forEach((n, i) => {
+    if (!n.x || n.x === 0) {
+      const angle = (i / kgNodes.length) * Math.PI * 2;
+      n.x = W/2 + Math.cos(angle) * (W * 0.3);
+      n.y = H/2 + Math.sin(angle) * (H * 0.3);
+      n.vx = 0; n.vy = 0;
+    }
+  });
+}
+
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  initNodePositions();
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function getNode(id) { return kgNodes.find(n => n.id === id); }
+
+let hoveredNode = null;
+let draggingNode = null;
+let mouseX = 0, mouseY = 0;
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+  if (draggingNode) { draggingNode.x = mouseX; draggingNode.y = mouseY; return; }
+  hoveredNode = kgNodes.find(n => Math.hypot(n.x - mouseX, n.y - mouseY) < 22) || null;
+  canvas.style.cursor = hoveredNode ? 'pointer' : 'grab';
+
+  const popup = document.getElementById('node-popup');
+  if (hoveredNode) {
+    popup.style.display = 'block';
+    popup.style.left = (e.clientX + 14) + 'px';
+    popup.style.top = (e.clientY - 10) + 'px';
+    popup.innerHTML = `<h5>${hoveredNode.id}</h5><p><strong>Type:</strong> ${hoveredNode.type}<br>${hoveredNode.desc || ''}</p>`;
+  } else {
+    popup.style.display = 'none';
+  }
+});
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  draggingNode = kgNodes.find(n => Math.hypot(n.x - mx, n.y - my) < 22) || null;
+});
+canvas.addEventListener('mouseup', () => { draggingNode = null; });
+canvas.addEventListener('mouseleave', () => {
+  document.getElementById('node-popup').style.display = 'none';
+  draggingNode = null;
+});
+
+function forceLayout() {
+  const W = canvas.width, H = canvas.height;
+  // repulsion
+  for (let i = 0; i < kgNodes.length; i++) {
+    for (let j = i + 1; j < kgNodes.length; j++) {
+      const a = kgNodes[i], b = kgNodes[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.max(Math.hypot(dx, dy), 1);
+      const force = 4000 / (dist * dist);
+      a.vx -= (dx / dist) * force; a.vy -= (dy / dist) * force;
+      b.vx += (dx / dist) * force; b.vy += (dy / dist) * force;
+    }
+  }
+  // attraction along edges
+  kgEdges.forEach(e => {
+    const s = getNode(e.s), o = getNode(e.o);
+    if (!s || !o) return;
+    const dx = o.x - s.x, dy = o.y - s.y;
+    const dist = Math.max(Math.hypot(dx, dy), 1);
+    const force = (dist - 120) * 0.03;
+    s.vx += (dx / dist) * force; s.vy += (dy / dist) * force;
+    o.vx -= (dx / dist) * force; o.vy -= (dy / dist) * force;
+  });
+  // center gravity
+  kgNodes.forEach(n => {
+    if (n === draggingNode) return;
+    n.vx += (W / 2 - n.x) * 0.003;
+    n.vy += (H / 2 - n.y) * 0.003;
+    n.vx *= 0.85; n.vy *= 0.85;
+    n.x += n.vx; n.y += n.vy;
+    n.x = Math.max(30, Math.min(W - 30, n.x));
+    n.y = Math.max(30, Math.min(H - 30, n.y));
+  });
+}
+
+function drawGraph() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid dots background
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  for (let x = 0; x < W; x += 30) for (let y = 0; y < H; y += 30)
+    ctx.fillRect(x, y, 1, 1);
+
+  forceLayout();
+
+  // Edges
+  kgEdges.forEach(e => {
+    const s = getNode(e.s), o = getNode(e.o);
+    if (!s || !o) return;
+    const mx = (s.x + o.x) / 2, my = (s.y + o.y) / 2;
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(o.x, o.y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Arrow
+    const angle = Math.atan2(o.y - s.y, o.x - s.x);
+    const ax = o.x - Math.cos(angle) * 22, ay = o.y - Math.sin(angle) * 22;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.fill();
+
+    // Label
+    ctx.font = '9px IBM Plex Mono';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.textAlign = 'center';
+    ctx.fillText(e.p, mx, my - 4);
+  });
+
+  // Nodes
+  kgNodes.forEach(n => {
+    const color = nodeTypes[n.type] || '#8b9fff';
+    const isHovered = n === hoveredNode;
+    const r = isHovered ? 22 : 18;
+    // glow
+    if (isHovered) {
+      const grd = ctx.createRadialGradient(n.x, n.y, r, n.x, n.y, r * 2.5);
+      grd.addColorStop(0, color + '55');
+      grd.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(n.x, n.y, r * 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = grd; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = isHovered ? color : color + 'bb';
+    ctx.fill();
+    ctx.strokeStyle = isHovered ? '#fff' : color;
+    ctx.lineWidth = isHovered ? 2 : 1;
+    ctx.stroke();
+
+    ctx.font = `${isHovered ? 600 : 400} 10px IBM Plex Mono`;
+    ctx.fillStyle = isHovered ? '#fff' : 'rgba(255,255,255,0.85)';
+    ctx.textAlign = 'center';
+    ctx.fillText(n.id.length > 12 ? n.id.slice(0, 11) + '…' : n.id, n.x, n.y + r + 13);
+  });
+
+  requestAnimationFrame(drawGraph);
+}
+drawGraph();
+
+function addTriple() {
+  const s = document.getElementById('triple-s').value.trim();
+  const p = document.getElementById('triple-p').value.trim();
+  const o = document.getElementById('triple-o').value.trim();
+  if (!s || !p || !o) { alert('Fill in all three fields.'); return; }
+
+  if (!kgNodes.find(n => n.id === s)) {
+    const angle = Math.random() * Math.PI * 2;
+    kgNodes.push({ id: s, type: inferNodeType(s), x: canvas.width/2 + Math.cos(angle)*100, y: canvas.height/2 + Math.sin(angle)*100, vx: 0, vy: 0, desc: '' });
+  }
+  if (!kgNodes.find(n => n.id === o)) {
+    const angle = Math.random() * Math.PI * 2;
+    kgNodes.push({ id: o, type: inferNodeType(o), x: canvas.width/2 + Math.cos(angle)*100, y: canvas.height/2 + Math.sin(angle)*100, vx: 0, vy: 0, desc: '' });
+  }
+  kgEdges.push({ s, p, o });
+  updateTripleList();
+  document.getElementById('triple-s').value = '';
+  document.getElementById('triple-p').value = '';
+  document.getElementById('triple-o').value = '';
+}
+
+function updateTripleList() {
+  document.getElementById('triple-list').innerHTML = kgEdges.map(e =>
+    `<span style="color:var(--kg)">( <span style="color:var(--text)">${e.s}</span> → <span style="color:var(--warn)">${e.p}</span> → <span style="color:var(--text)">${e.o}</span> )</span>`
+  ).join('<br>');
+}
+updateTripleList();
+
+// ─── CHUNKY DASHBOARD ──────────────────────────────────────────────────────
+
+const CHUNKY_PRESETS = {
+  Balanced:  { max_tokens: 400, overlap_pct: '20%', splitting_unit: 'paragraph_first', emphasis_mode: 'both', min_chunk_tokens: 20 },
+  Precision: { max_tokens: 200, overlap_pct: '25%', splitting_unit: 'sentence_greedy', emphasis_mode: 'both', min_chunk_tokens: 20 },
+  Speed:     { max_tokens: 512, overlap_pct: '10%', splitting_unit: 'paragraph_first', emphasis_mode: 'strip', min_chunk_tokens: 20 },
+};
+
+const CHUNKY_CHUNKS = [
+  { id: 'a3f91b', breadcrumb: 'darwin.md', level: 0, is_intro: true, seq: 0, tokens: 48, terms: [],
+    overlap: '',
+    text: 'darwin.md\n\nCharles Darwin was a British naturalist who proposed the theory of evolution. On the Origin of Species (important), published in 1859, transformed modern biology.\n\nKey terms: On the Origin of Species' },
+  { id: 'b71c4e', breadcrumb: 'darwin.md > Early Life', level: 2, is_intro: false, seq: 0, tokens: 72, terms: ['Shrewsbury'],
+    overlap: '',
+    text: 'darwin.md > Early Life\n\nBorn in Shrewsbury (important) on 12 February 1809, Darwin was the fifth of six children. His father Robert Darwin was a wealthy doctor and financier.\n\nKey terms: Shrewsbury' },
+  { id: 'c22da1', breadcrumb: 'darwin.md > Voyage of the Beagle', level: 2, is_intro: false, seq: 0, tokens: 98, terms: ['Galápagos Islands'],
+    overlap: '',
+    text: 'darwin.md > Voyage of the Beagle\n\nFrom 1831 to 1836 Darwin sailed around the world on HMS Beagle. The voyage took him to the Galápagos Islands (important) where he observed finch beak variation across islands.\n\nKey terms: Galápagos Islands' },
+  { id: 'd88f22', breadcrumb: 'darwin.md > Voyage of the Beagle > Galápagos Observations', level: 3, is_intro: false, seq: 0, tokens: 68, terms: ['natural selection'],
+    overlap: 'he observed finch beak variation across islands. [...]',
+    text: 'darwin.md > Voyage of the Beagle > Galápagos Observations\n\nhe observed finch beak variation across islands. [...]\n\nDarwin noted that each island had a distinct finch species adapted to local food sources. This observation seeded his later thinking on natural selection (important).\n\nKey terms: natural selection' },
+  { id: 'e11b90', breadcrumb: 'darwin.md > Theory of Evolution', level: 2, is_intro: false, seq: 0, tokens: 88, terms: [],
+    overlap: '',
+    text: 'darwin.md > Theory of Evolution\n\nDarwin spent over twenty years refining his ideas before publishing. He corresponded extensively with Alfred Russel Wallace, who independently reached similar conclusions.' },
+  { id: 'f53c01', breadcrumb: 'darwin.md > The Life of Charles Darwin', level: 1, is_intro: true, seq: 0, tokens: 312, terms: ['On the Origin of Species'],
+    overlap: '',
+    text: 'darwin.md > The Life of Charles Darwin\n\nCharles Darwin was a British naturalist... [intro — full document root text preserved as section intro chunk]\n\nKey terms: On the Origin of Species' },
+  { id: 'g04d7a', breadcrumb: 'darwin.md > Voyage of the Beagle', level: 2, is_intro: true, seq: 0, tokens: 52, terms: [],
+    overlap: '',
+    text: 'darwin.md > Voyage of the Beagle\n\n[Section intro: context above child H3 headings — no emphasized terms]' },
+  { id: 'h76e3b', breadcrumb: 'darwin.md > Theory of Evolution', level: 2, is_intro: false, seq: 1, tokens: 61, terms: [],
+    overlap: 'He corresponded extensively with Alfred Russel Wallace. [...]',
+    text: 'darwin.md > Theory of Evolution\n\nHe corresponded extensively with Alfred Russel Wallace. [...]\n\nWallace\'s parallel discovery prompted Darwin to publish jointly in 1858, then release the full work in 1859.' },
+];
+
+// Simulated UMAP coords + level colours
+const UMAP_POINTS = [
+  { x: 22, y: 45, level: 0, label: 'root intro', tip: 'darwin.md root · 48 tok' },
+  { x: 35, y: 28, level: 1, label: 'H1 intro',   tip: 'The Life · 312 tok' },
+  { x: 58, y: 62, level: 2, label: 'Early Life',  tip: 'Early Life · 72 tok' },
+  { x: 72, y: 38, level: 2, label: 'Beagle',      tip: 'Voyage of the Beagle · 98 tok' },
+  { x: 80, y: 72, level: 3, label: 'Galápagos',   tip: 'Galápagos Observations · 68 tok' },
+  { x: 45, y: 78, level: 2, label: 'Theory',      tip: 'Theory of Evolution · 88 tok' },
+  { x: 55, y: 82, level: 2, label: 'Beagle intro',tip: 'Voyage intro · 52 tok' },
+  { x: 40, y: 68, level: 2, label: 'Theory seq1', tip: 'Theory seq 1 · 61 tok' },
+];
+const LEVEL_COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444'];
+
+// query→result sim scores (keyword overlap, precomputed)
+const CHUNKY_QUERY_SCORES = {
+  default: [
+    { ci: 3, score: 0.91 }, // Galápagos
+    { ci: 7, score: 0.74 }, // seq1 theory (overlap with prev)
+    { ci: 2, score: 0.66 }, // Beagle
+  ],
+};
+
+let chunkyCurrentStage = 0;
+
+function chunkyStage(i) {
+  document.querySelectorAll('.cstage').forEach(el => el.classList.remove('cs-visible'));
+  document.querySelectorAll('.cstep').forEach(el => el.classList.remove('cs-active'));
+  document.getElementById('cstage-' + i).classList.add('cs-visible');
+  document.getElementById('cstep-' + i).classList.add('cs-active');
+  chunkyCurrentStage = i;
+  if (i === 1) renderConfig('Balanced');
+  if (i === 2) renderChunkyTable();
+  if (i === 3) renderScatter();
+}
+
+function chunkyNext() { if (chunkyCurrentStage < 5) chunkyStage(chunkyCurrentStage + 1); }
+function chunkyPrev() { if (chunkyCurrentStage > 0) chunkyStage(chunkyCurrentStage - 1); }
+
+function selectPreset(name, el) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('pb-active'));
+  el.classList.add('pb-active');
+  renderConfig(name);
+}
+
+function renderConfig(presetName) {
+  const p = CHUNKY_PRESETS[presetName] || CHUNKY_PRESETS['Balanced'];
+  const grid = document.getElementById('chunky-config-grid');
+  const rows = [
+    ['max_tokens', p.max_tokens, 'Hard ceiling per chunk. A chunk will never exceed this.'],
+    ['overlap_pct', p.overlap_pct, 'Fraction of previous chunk to prepend as context overlap.'],
+    ['splitting_unit', p.splitting_unit, '"paragraph_first" or "sentence_greedy" strategy.'],
+    ['emphasis_mode', p.emphasis_mode, '"both", "inline", "suffix", or "strip" for **bold** handling.'],
+    ['min_chunk_tokens', p.min_chunk_tokens, 'Chunks shorter than this are discarded unless sole output.'],
+    ['include_breadcrumb', 'true', 'Prepend "Title > H1 > H2" line to chunk text.'],
+  ];
+  grid.innerHTML = rows.map(([k, v, note]) => `
+    <div class="config-row">
+      <label>${k}</label>
+      <div class="config-val">${v}</div>
+      <div class="config-note">${note}</div>
+    </div>`).join('');
+}
+
+function renderChunkyTable() {
+  const tbody = document.getElementById('chunky-tbody');
+  tbody.innerHTML = CHUNKY_CHUNKS.map((c, i) => `
+    <tr onclick="inspectChunk(${i})">
+      <td class="td-id">${i + 1}</td>
+      <td class="td-id">${c.id}</td>
+      <td class="td-bc">${c.breadcrumb}</td>
+      <td class="td-tok">${c.tokens}</td>
+      <td class="td-intro">${c.is_intro
+        ? '<span class="pill pill-yes">intro</span>'
+        : '<span class="pill pill-no">—</span>'}</td>
+      <td class="td-preview">${c.text.split('\n\n')[1] || c.text}</td>
+    </tr>`).join('');
+}
+
+function inspectChunk(i) {
+  const c = CHUNKY_CHUNKS[i];
+  document.getElementById('chunky-inspector').innerHTML = `
+    <div class="ci-row"><span class="ci-key">id</span><span class="ci-val cv-rag">${c.id}</span></div>
+    <div class="ci-row"><span class="ci-key">breadcrumb</span><span class="ci-val cv-rag">${c.breadcrumb}</span></div>
+    <div class="ci-row"><span class="ci-key">level</span><span class="ci-val">${c.level}</span></div>
+    <div class="ci-row"><span class="ci-key">is_section_intro</span><span class="ci-val">${c.is_intro}</span></div>
+    <div class="ci-row"><span class="ci-key">sequence_in_section</span><span class="ci-val">${c.seq}</span></div>
+    <div class="ci-row"><span class="ci-key">token_estimate</span><span class="ci-val cv-warn">${c.tokens}</span></div>
+    <div class="ci-row"><span class="ci-key">emphasized_terms</span><span class="ci-val cv-rag">[${c.terms.join(', ')}]</span></div>
+    <div class="ci-row"><span class="ci-key">overlap_prefix</span><span class="ci-val" style="color:var(--muted)">"${c.overlap || '(none)'}"</span></div>
+    <div class="ci-row" style="align-items:flex-start"><span class="ci-key">text</span><span class="ci-val cv-text">${c.text.replace(/\n/g,'↵ ')}</span></div>`;
+}
+
+function renderScatter() {
+  const wrap = document.getElementById('chunky-scatter');
+  // keep axis labels, clear dots
+  wrap.querySelectorAll('.scatter-dot').forEach(d => d.remove());
+  UMAP_POINTS.forEach((pt, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'scatter-dot';
+    dot.style.left = pt.x + '%';
+    dot.style.top = (100 - pt.y) + '%';  // flip Y
+    dot.style.background = LEVEL_COLORS[pt.level] || '#8b9fff';
+    dot.style.opacity = '0.85';
+    dot.setAttribute('data-tip', pt.tip);
+    dot.setAttribute('title', pt.tip);
+    wrap.appendChild(dot);
+  });
+}
+
+function runChunkyQuery() {
+  const results = CHUNKY_QUERY_SCORES.default;
+  const withParent = document.getElementById('chunky-parent-ctx').checked;
+  const out = document.getElementById('chunky-results');
+
+  let expanded = [...results];
+  if (withParent) {
+    // chunk at index 3 (Galápagos) has parent chunk at index 2 (Beagle)
+    if (!expanded.find(r => r.ci === 2)) expanded.push({ ci: 2, score: null, isParent: true });
+  }
+
+  out.innerHTML = expanded.map((r, rank) => {
+    const c = CHUNKY_CHUNKS[r.ci];
+    const parentBadge = r.isParent ? '<span class="tag tag-kg" style="margin-left:6px">parent_context</span>' : '';
+    const scoreBadge = r.score !== null
+      ? `<span class="qr-score">${r.score} sim</span>`
+      : `<span class="qr-score" style="background:var(--kg-dim);color:var(--kg)">↑ expanded</span>`;
+    return `<div class="qresult-card" style="${r.isParent ? 'border-left-color:var(--kg)' : ''}">
+      <div class="qr-header">
+        <span class="qr-rank">#${rank + 1}</span>
+        ${scoreBadge}
+        <span class="qr-bc">${c.breadcrumb}</span>
+        ${parentBadge}
+      </div>
+      <div class="qr-text">${c.text.split('\n\n').slice(1, 2).join('') || c.text}</div>
+      ${c.terms.length ? `<div class="qr-terms">${c.terms.map(t => `<span class="tag tag-rag">${t}</span>`).join('')}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Init config grid on load
+renderConfig('Balanced');
+
+// ─── END CHUNKY DASHBOARD ──────────────────────────────────────────────────
+
+function runSparql(pred) {
+  const results = kgEdges.filter(e => e.p === pred || e.p === pred + '←');
+  const out = document.getElementById('sparql-output');
+  if (!results.length) {
+    out.innerHTML = `<span style="color:var(--muted)">No matches found for predicate: ${pred}\n(Add some triples first!)</span>`;
+    return;
+  }
+  out.innerHTML = results.map((r, i) =>
+    `<span style="color:var(--muted)">row ${i + 1}:</span>  <span style="color:var(--rag)">${r.s}</span>  <span style="color:var(--warn)">${r.p}</span>  <span style="color:var(--kg)">${r.o}</span>`
+  ).join('\n');
+}
+</script>
+</body>
+</html>
