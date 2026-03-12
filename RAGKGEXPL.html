@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RAG & Knowledge Graphs — Interactive Explorer</title>
@@ -729,6 +730,7 @@
   <div>
     <h1><span class="r">RAG</span> &amp; <span class="k">Knowledge Graphs</span></h1>
     <p style="margin-top:6px">An interactive explorer — click through pipelines, inspect components, run mini simulations</p>
+    <p style="margin-top:6px">NOTE: Try out a demo for Chunkdown; a markdown chunker pipeline available for download at <a href="https://github.com/effeemmeelle/Chunkdown" target="_blank">https://github.com/effeemmeelle/Chunkdown</a></p>
   </div>
 </header>
 
@@ -862,8 +864,8 @@ Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his de
       <h3>🔪 Chunky — Markdown RAG Chunker Dashboard</h3>
       <p>A full pipeline tool for turning Markdown documents into embedding-ready chunks, with a provenance knowledge graph and interactive query interface. The walkthrough below mirrors the exact stages of the live app using pre-loaded dummy data. Click each stage button to step through it.</p>
     </div>
-    <a class="btn-link" href="https://YOUR-USERNAME.github.io/YOUR-REPO/RAGKGEXPL.html" target="_blank" id="chunky-gh-link">
-      ↗ Open Live App
+    <a class="btn-link" href="https://github.com/effeemmeelle/Chunkdown" target="_blank" id="chunky-gh-link">
+      ↗ Try the real thing on the Chunkdown repository
     </a>
   </div>
 
@@ -1023,39 +1025,101 @@ Napoleon Bonaparte was exiled to the island of Saint Helena in 1815 after his de
   </div>
 
   <!-- ── STAGE 4 : KG ── -->
-  <div class="cstage" id="cstage-4">
-    <div class="info-tip" style="font-size:11px;margin-bottom:14px">
-      The provenance graph connects <span style="color:#60a5fa">section nodes</span> (structural) and <span style="color:#4ade80">chunk nodes</span> (content) via four typed edge kinds. In the live app this renders as a D3 force-directed graph you can pan, zoom, and click.
+<div class="cstage" id="cstage-4">
+<div class="info-tip" style="font-size:11px;margin-bottom:14px">
+    The provenance graph connects <span style="color:#60a5fa">section nodes</span> (structural)
+    and <span style="color:#4ade80">chunk nodes</span> (content) via four typed edge kinds.
+    Drag nodes · hover for details · use the toolbar controls.
+</div>
+
+<div class="chunk-stats-row">
+    <div class="cstat"><div class="sv" style="color:#60a5fa">6</div><div class="sk">Section nodes</div></div>
+    <div class="cstat"><div class="sv" style="color:#4ade80">8</div><div class="sk">Chunk nodes</div></div>
+    <div class="cstat"><div class="sv">27</div><div class="sk">Total edges</div></div>
+</div>
+
+<!-- Toolbar -->
+<div id="kg-toolbar" style="
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:7px 12px;background:var(--surface);border:1px solid var(--border);
+    border-radius:6px 6px 0 0;font-size:10px">
+    <span style="color:var(--muted);letter-spacing:.08em;text-transform:uppercase;font-weight:600">View</span>
+    <label style="display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
+    <input type="checkbox" id="kg-chk-labels" checked style="accent-color:var(--kg);width:12px;height:12px"> Labels
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
+    <input type="checkbox" id="kg-chk-sections" checked style="accent-color:var(--kg);width:12px;height:12px"> Sections
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
+    <input type="checkbox" id="kg-chk-chunks" checked style="accent-color:var(--kg);width:12px;height:12px"> Chunks
+    </label>
+    <button id="kg-btn-fit" style="
+    background:transparent;border:1px solid var(--border-bright);border-radius:3px;
+    padding:3px 9px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+    font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);cursor:pointer">Reset view</button>
+    <button id="kg-btn-freeze" style="
+    background:transparent;border:1px solid var(--border-bright);border-radius:3px;
+    padding:3px 9px;font-family:'IBM Plex Mono',monospace;font-size:10px;
+    font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);cursor:pointer">Freeze layout</button>
+    <div style="margin-left:auto;display:flex;gap:10px;align-items:center;font-size:10px;color:var(--muted)">
+    <span style="display:flex;align-items:center;gap:5px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#60a5fa;display:inline-block"></span>Section
+    </span>
+    <span style="display:flex;align-items:center;gap:5px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#4ade80;display:inline-block"></span>Intro chunk
+    </span>
+    <span style="display:flex;align-items:center;gap:5px">
+        <span style="width:10px;height:10px;border-radius:50%;background:#86efac;display:inline-block"></span>Chunk
+    </span>
     </div>
-    <div class="two-col">
-      <div>
-        <div class="label-row" style="margin-bottom:8px">Graph summary</div>
-        <div class="chunk-stats-row">
-          <div class="cstat"><div class="sv" style="color:#60a5fa">6</div><div class="sk">Section nodes</div></div>
-          <div class="cstat"><div class="sv" style="color:#4ade80">8</div><div class="sk">Chunk nodes</div></div>
-          <div class="cstat"><div class="sv">27</div><div class="sk">Total edges</div></div>
-        </div>
-        <div class="label-row" style="margin-bottom:8px">Edge legend</div>
-        <div style="font-size:11px;line-height:2.2">
-          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#3b82f6;border-radius:2px"></span><span style="color:var(--muted)">contains_section</span></div>
-          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#22c55e;border-radius:2px"></span><span style="color:var(--muted)">has_chunk</span></div>
-          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#f59e0b;border-radius:2px"></span><span style="color:var(--muted)">next_in_section</span></div>
-          <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:2px;background:#ef4444;border-radius:2px;border-top:2px dashed #ef4444;height:0"></span><span style="color:var(--muted)">parent_context (dashed)</span></div>
-        </div>
-      </div>
-      <div>
-        <div class="label-row" style="margin-bottom:8px">Provenance edges — darwin.md</div>
-        <div class="kg-prov">
-          <div class="kg-edge"><span class="kg-edge-from kef-section">node_root</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h1_1 "The Life of Charles Darwin"</span></div>
-          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h1_1</span><span class="kg-arrow">→</span><span class="kg-edge-label">contains_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-section">node_h2_2 "Early Life"</span></div>
-          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_2</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_a3f9 (intro, seq 0)</span></div>
-          <div class="kg-edge"><span class="kg-edge-from kef-section">node_h2_4 "Galápagos Obs."</span><span class="kg-arrow">→</span><span class="kg-edge-label">has_chunk</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (seq 0)</span></div>
-          <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_b71c</span><span class="kg-arrow">→</span><span class="kg-edge-label">next_in_section</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_c22d (seq 1)</span></div>
-          <div class="kg-edge"><span class="kg-edge-from kef-chunk">chunk_c22d</span><span class="kg-arrow">→</span><span class="kg-edge-label" style="color:#ef4444">parent_context</span><span class="kg-arrow">→</span><span class="kg-edge-from kef-chunk">chunk_b71c (intro of parent)</span></div>
-        </div>
-      </div>
+</div>
+
+<!-- Graph canvas -->
+<div id="kg-d3-wrap" style="
+    position:relative;width:100%;height:400px;
+    background:#070910;border:1px solid var(--border);border-top:none;
+    border-radius:0 0 6px 6px;overflow:hidden;cursor:grab">
+    <svg id="kg-d3-svg" style="width:100%;height:100%"></svg>
+    <div id="kg-d3-tip" style="
+    position:absolute;background:var(--surface);border:1px solid var(--kg);
+    border-radius:5px;padding:10px 14px;font-size:11px;max-width:240px;
+    pointer-events:none;display:none;z-index:100;
+    box-shadow:0 6px 24px rgba(0,0,0,.6);line-height:1.7"></div>
+</div>
+
+<!-- Edge legend -->
+<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:var(--muted)">
+    <span style="display:flex;align-items:center;gap:6px">
+    <span style="display:inline-block;width:22px;height:2px;background:#3b82f6;border-radius:2px"></span>contains_section</span>
+    <span style="display:flex;align-items:center;gap:6px">
+    <span style="display:inline-block;width:22px;height:2px;background:#22c55e;border-radius:2px"></span>has_chunk</span>
+    <span style="display:flex;align-items:center;gap:6px">
+    <span style="display:inline-block;width:22px;height:2px;background:#f59e0b;border-radius:2px"></span>next_in_section</span>
+    <span style="display:flex;align-items:center;gap:6px">
+    <span style="display:inline-block;width:22px;height:0;border-top:2px dashed #ef4444"></span>parent_context</span>
+</div>
+
+<!-- Two-col detail cards (kept from original) -->
+<div class="two-col" style="margin-top:16px">
+    <div class="card kg-card">
+    <h3>Edge type breakdown</h3>
+    <div style="font-size:11px;line-height:2.2">
+        <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#3b82f6;border-radius:2px"></span><span style="color:var(--muted)">contains_section</span><span style="margin-left:auto;color:var(--text)">5</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#22c55e;border-radius:2px"></span><span style="color:var(--muted)">has_chunk</span><span style="margin-left:auto;color:var(--text)">8</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:3px;background:#f59e0b;border-radius:2px"></span><span style="color:var(--muted)">next_in_section</span><span style="margin-left:auto;color:var(--text)">7</span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:24px;height:0;border-top:2px dashed #ef4444"></span><span style="color:var(--muted)">parent_context</span><span style="margin-left:auto;color:var(--text)">7</span></div>
     </div>
-  </div>
+    </div>
+    <div class="card kg-card">
+    <h3>Provenance edges — darwin.md</h3>
+    <div class="kg-prov">
+        <!-- (keep original provenance edge rows here) -->
+    </div>
+    </div>
+</div>
+</div>
 
   <!-- ── STAGE 5 : QUERY ── -->
   <div class="cstage" id="cstage-5">
@@ -1873,6 +1937,178 @@ function runSparql(pred) {
     `<span style="color:var(--muted)">row ${i + 1}:</span>  <span style="color:var(--rag)">${r.s}</span>  <span style="color:var(--warn)">${r.p}</span>  <span style="color:var(--kg)">${r.o}</span>`
   ).join('\n');
 }
+
+// ─── STAGE 4 D3 KNOWLEDGE GRAPH ────────────────────────────────────────────
+(function initKgD3(){
+  const KG_NODES = [
+    {id:'root',       type:'section', label:'darwin.md',           level:0, desc:'Root document node'},
+    {id:'h1_darwin',  type:'section', label:'The Life of C. Darwin',level:1, desc:'H1 — full document scope'},
+    {id:'h2_early',   type:'section', label:'Early Life',           level:2, desc:'H2 — birth and family'},
+    {id:'h2_beagle',  type:'section', label:'Voyage of the Beagle', level:2, desc:'H2 — 1831–1836 voyage'},
+    {id:'h3_galap',   type:'section', label:'Galápagos Obs.',       level:3, desc:'H3 — finch variation'},
+    {id:'h2_theory',  type:'section', label:'Theory of Evolution',  level:2, desc:'H2 — publication'},
+    {id:'ck_root',    type:'chunk',   label:'root intro',           level:0, tokens:48,  is_intro:true,  seq:0, desc:'Document root intro'},
+    {id:'ck_h1',      type:'chunk',   label:'H1 intro',             level:1, tokens:312, is_intro:true,  seq:0, desc:'Full doc intro — 312 tokens'},
+    {id:'ck_early0',  type:'chunk',   label:'Early Life seq 0',     level:2, tokens:72,  is_intro:false, seq:0, desc:'Birth in Shrewsbury, 1809'},
+    {id:'ck_beagle0', type:'chunk',   label:'Beagle intro',         level:2, tokens:52,  is_intro:true,  seq:0, desc:'Section intro for Voyage'},
+    {id:'ck_beagle1', type:'chunk',   label:'Beagle seq 1',         level:2, tokens:98,  is_intro:false, seq:1, desc:'Voyage and Galápagos arrival'},
+    {id:'ck_galap0',  type:'chunk',   label:'Galápagos seq 0',      level:3, tokens:68,  is_intro:false, seq:0, desc:'Finch beak variation'},
+    {id:'ck_theory0', type:'chunk',   label:'Theory seq 0',         level:2, tokens:88,  is_intro:false, seq:0, desc:'Twenty years, Wallace'},
+    {id:'ck_theory1', type:'chunk',   label:'Theory seq 1',         level:2, tokens:61,  is_intro:false, seq:1, desc:'Joint 1858 pub, Origin 1859'},
+  ];
+  const KG_EDGES = [
+    {s:'root',      t:'h1_darwin',  type:'contains_section'},
+    {s:'h1_darwin', t:'h2_early',   type:'contains_section'},
+    {s:'h1_darwin', t:'h2_beagle',  type:'contains_section'},
+    {s:'h1_darwin', t:'h2_theory',  type:'contains_section'},
+    {s:'h2_beagle', t:'h3_galap',   type:'contains_section'},
+    {s:'root',      t:'ck_root',    type:'has_chunk'},
+    {s:'h1_darwin', t:'ck_h1',      type:'has_chunk'},
+    {s:'h2_early',  t:'ck_early0',  type:'has_chunk'},
+    {s:'h2_beagle', t:'ck_beagle0', type:'has_chunk'},
+    {s:'h2_beagle', t:'ck_beagle1', type:'has_chunk'},
+    {s:'h3_galap',  t:'ck_galap0',  type:'has_chunk'},
+    {s:'h2_theory', t:'ck_theory0', type:'has_chunk'},
+    {s:'h2_theory', t:'ck_theory1', type:'has_chunk'},
+    {s:'ck_beagle0',t:'ck_beagle1', type:'next_in_section'},
+    {s:'ck_theory0',t:'ck_theory1', type:'next_in_section'},
+    {s:'ck_beagle1',t:'ck_beagle0', type:'parent_context'},
+    {s:'ck_galap0', t:'ck_beagle0', type:'parent_context'},
+    {s:'ck_theory1',t:'ck_theory0', type:'parent_context'},
+    {s:'ck_early0', t:'ck_h1',      type:'parent_context'},
+    {s:'ck_root',   t:'ck_h1',      type:'parent_context'},
+  ];
+  const EM = {
+    contains_section:{stroke:'#3b82f6',w:2.2,dash:null},
+    has_chunk:        {stroke:'#22c55e',w:1.6,dash:null},
+    next_in_section:  {stroke:'#f59e0b',w:1.4,dash:null},
+    parent_context:   {stroke:'#ef4444',w:1.2,dash:'5,3'},
+  };
+  const nodeR   = n => n.type==='section' ? 14 : 9;
+  const nodeFill= n => n.type==='section' ? '#60a5fa' : (n.is_intro ? '#4ade80' : '#86efac');
+  const nodeStr = n => n.type==='section' ? '#3b82f6' : '#22c55e';
+
+  // Wait until D3 is loaded (it's loaded at page level via CDN)
+  function tryInit() {
+    if (typeof d3 === 'undefined') { setTimeout(tryInit, 100); return; }
+
+    const wrap = document.getElementById('kg-d3-wrap');
+    const tip  = document.getElementById('kg-d3-tip');
+    if (!wrap) return;
+
+    let W = wrap.clientWidth, H = wrap.clientHeight;
+    const svg = d3.select('#kg-d3-svg').attr('width',W).attr('height',H);
+
+    // Arrow markers
+    const defs = svg.append('defs');
+    Object.entries(EM).forEach(([et,m]) => {
+      defs.append('marker').attr('id','karr-'+et)
+        .attr('viewBox','0 -5 10 10').attr('refX',20).attr('refY',0)
+        .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+        .append('path').attr('d','M0,-4L9,0L0,4')
+        .attr('fill',m.stroke).attr('opacity',.8);
+    });
+
+    const zoomG = svg.append('g');
+    const zoom  = d3.zoom().scaleExtent([.05,5])
+      .on('zoom', ev => zoomG.attr('transform',ev.transform));
+    svg.call(zoom).style('cursor','grab');
+
+    const nodes = KG_NODES.map(d=>({...d}));
+    const links = KG_EDGES.map(d=>({...d,source:d.s,target:d.t}));
+
+    const sim = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(links).id(d=>d.id).distance(d=>d.type==='contains_section'?110:70).strength(.5))
+      .force('charge', d3.forceManyBody().strength(-300).distanceMax(380))
+      .force('center', d3.forceCenter(W/2,H/2))
+      .force('collision', d3.forceCollide(d=>nodeR(d)+18));
+
+    const linkG  = zoomG.append('g');
+    const linkEl = linkG.selectAll('line').data(links).join('line')
+      .attr('stroke', d=>EM[d.type].stroke)
+      .attr('stroke-width', d=>EM[d.type].w)
+      .attr('stroke-dasharray', d=>EM[d.type].dash||null)
+      .attr('stroke-opacity',.7)
+      .attr('marker-end', d=>`url(#karr-${d.type})`);
+
+    const nodeG  = zoomG.append('g');
+    const nodeEl = nodeG.selectAll('g').data(nodes).join('g')
+      .attr('class', d=>'kng kng-'+d.type)
+      .style('cursor','grab')
+      .call(d3.drag()
+        .on('start',(ev,d)=>{if(!ev.active)sim.alphaTarget(.3).restart();d.fx=d.x;d.fy=d.y})
+        .on('drag', (ev,d)=>{d.fx=ev.x;d.fy=ev.y})
+        .on('end',  (ev,d)=>{if(!ev.active)sim.alphaTarget(0);d.fx=null;d.fy=null}));
+
+    nodeEl.append('circle')
+      .attr('r',d=>nodeR(d)).attr('fill',d=>nodeFill(d))
+      .attr('stroke',d=>nodeStr(d)).attr('stroke-width',1.5).attr('opacity',.88);
+
+    const lblEl = nodeEl.append('text')
+      .attr('text-anchor','middle').attr('dy',d=>nodeR(d)+12)
+      .attr('font-size',9).attr('fill','rgba(255,255,255,.7)')
+      .attr('font-family',"'IBM Plex Mono',monospace").attr('pointer-events','none')
+      .text(d=>{ const l=d.label||''; return l.length>16?l.slice(0,15)+'…':l; });
+
+    // Tooltip
+    nodeEl.on('mouseover',(ev,d)=>{
+      const pills = [];
+      if(d.type==='section') pills.push(`<span style="background:rgba(59,130,246,.2);color:#60a5fa;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px">section · H${d.level}</span>`);
+      if(d.is_intro) pills.push(`<span style="background:rgba(74,240,168,.15);color:#4af0a8;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px">section intro</span>`);
+      if(d.tokens)   pills.push(`<span style="background:rgba(240,208,72,.12);color:#f0d048;font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px">~${d.tokens} tokens</span>`);
+      tip.innerHTML = `<div style="color:var(--kg);font-size:12px;margin-bottom:4px;font-weight:600">${d.label}</div><div style="color:var(--text);margin-bottom:6px">${d.desc||''}</div>${pills.join(' ')}`;
+      tip.style.display='block';
+    })
+    .on('mousemove',ev=>{
+      const r=wrap.getBoundingClientRect();
+      let tx=ev.clientX-r.left+14, ty=ev.clientY-r.top-10;
+      if(tx+250>W) tx=ev.clientX-r.left-260;
+      tip.style.left=tx+'px'; tip.style.top=ty+'px';
+    })
+    .on('mouseout',()=>{ tip.style.display='none'; });
+
+    sim.on('tick',()=>{
+      linkEl.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y)
+             .attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+      nodeEl.attr('transform',d=>`translate(${d.x},${d.y})`);
+    });
+
+    // Controls
+    let frozen=false;
+    document.getElementById('kg-chk-labels').addEventListener('change',function(){
+      lblEl.style('display',this.checked?null:'none');
+    });
+    document.getElementById('kg-chk-sections').addEventListener('change',function(){
+      nodeG.selectAll('.kng-section').style('display',this.checked?null:'none');
+    });
+    document.getElementById('kg-chk-chunks').addEventListener('change',function(){
+      nodeG.selectAll('.kng-chunk').style('display',this.checked?null:'none');
+    });
+    document.getElementById('kg-btn-freeze').addEventListener('click',function(){
+      frozen=!frozen; this.textContent=frozen?'Unfreeze layout':'Freeze layout';
+      if(frozen) sim.stop();
+      else { sim.alphaTarget(.1).restart(); setTimeout(()=>sim.alphaTarget(0),2000); }
+    });
+    document.getElementById('kg-btn-fit').addEventListener('click',()=>{
+      const xs=nodes.map(d=>d.x).filter(v=>v!=null);
+      const ys=nodes.map(d=>d.y).filter(v=>v!=null);
+      if(!xs.length) return;
+      const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+      const bW=x1-x0||1,bH=y1-y0||1;
+      const scale=Math.min(W/(bW*1.25),H/(bH*1.25),3);
+      const tx=W/2-scale*(x0+bW/2),ty=H/2-scale*(y0+bH/2);
+      svg.transition().duration(600).call(zoom.transform,d3.zoomIdentity.translate(tx,ty).scale(scale));
+    });
+
+    // Resize
+    new ResizeObserver(()=>{
+      W=wrap.clientWidth; H=wrap.clientHeight;
+      svg.attr('width',W).attr('height',H);
+      sim.force('center',d3.forceCenter(W/2,H/2)).alpha(.15).restart();
+    }).observe(wrap);
+  }
+  tryInit();
+})();
 </script>
 </body>
 </html>
